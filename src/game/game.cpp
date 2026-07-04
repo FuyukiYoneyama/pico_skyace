@@ -910,25 +910,60 @@ void render_background() {
             }
         }
 
-        if (sky_x1 > sky_x0) {
-            const int d = g_hy - y;
-            gfx::hspan(y, sky_x0, sky_x1, d < 2 ? kColHaze : sky_color(d));
-        }
-        if (gnd_x1 > gnd_x0) {
-            int v = y - g_hy;
-            if (v < 1) {
-                v = 1;
+        if (g_slope_q8 == 0) {
+            // ロール無し: 色帯の境界も水平のままで良い（従来通り行1本で塗れる）
+            if (sky_x1 > sky_x0) {
+                const int d = g_hy - y;
+                gfx::hspan(y, sky_x0, sky_x1, d < 2 ? kColHaze : sky_color(d));
             }
-            uint16_t color;
-            const int z_m = alt_m * kFocal / v;
-            if (v < 3) {
-                color = kColHaze;
-            } else if (z_m > 2600) {
-                color = kColGndFar;
-            } else {
-                color = (((z_m + fwd_m) >> 6) & 1) ? kColGndA : kColGndB;
+            if (gnd_x1 > gnd_x0) {
+                int v = y - g_hy;
+                if (v < 1) {
+                    v = 1;
+                }
+                uint16_t color;
+                const int z_m = alt_m * kFocal / v;
+                if (v < 3) {
+                    color = kColHaze;
+                } else if (z_m > 2600) {
+                    color = kColGndFar;
+                } else {
+                    color = (((z_m + fwd_m) >> 6) & 1) ? kColGndA : kColGndB;
+                }
+                gfx::hspan(y, gnd_x0, gnd_x1, color);
             }
-            gfx::hspan(y, gnd_x0, gnd_x1, color);
+        } else {
+            // ロールあり: 色帯の境界（sky_color の段差・地面遠近ストライプ）を
+            // 傾いた地平線に合わせて回転させる。行 y・列 x ごとに、
+            // 「ロールが無かったとした場合の地平線からの垂直距離」を
+            // apply_roll の逆回転で求め、それを距離として使う
+            // （水平な段差のまま斜めの地平線と重なる「くさび形」を防ぐ）。
+            const int32_t py = y - g_hy;
+            for (int x = sky_x0; x < sky_x1; ++x) {
+                const int32_t px = x - kCx;
+                // dy_world < 0 が地平線より上（空）。d は水平線からの
+                // 正の距離にして従来の sky_color()/haze 判定と揃える。
+                const int32_t dy_world = (-px * g_sinr + py * g_cosr) >> 12;
+                const int d = static_cast<int>(-dy_world);
+                gfx::put_pixel(x, y, d < 2 ? kColHaze : sky_color(d));
+            }
+            for (int x = gnd_x0; x < gnd_x1; ++x) {
+                const int32_t px = x - kCx;
+                int v = static_cast<int>((-px * g_sinr + py * g_cosr) >> 12);
+                if (v < 1) {
+                    v = 1;
+                }
+                uint16_t color;
+                const int z_m = alt_m * kFocal / v;
+                if (v < 3) {
+                    color = kColHaze;
+                } else if (z_m > 2600) {
+                    color = kColGndFar;
+                } else {
+                    color = (((z_m + fwd_m) >> 6) & 1) ? kColGndA : kColGndB;
+                }
+                gfx::put_pixel(x, y, color);
+            }
         }
     }
 
