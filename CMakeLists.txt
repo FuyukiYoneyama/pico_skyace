@@ -27,19 +27,29 @@ add_executable(pico_skyace
     src/platform/picocalc_display.cpp
     src/platform/lcd_rgb565_pio.cpp
     src/platform/picocalc_keyboard.cpp
+    src/platform/picocalc_audio.cpp
+    src/platform/screenshot_capture.cpp
+    src/platform/sd/picocalc_sdcard.cpp
+    src/platform/sd/fatfs_diskio.cpp
     src/game/fixed_math.cpp
     src/game/gfx.cpp
     src/game/game.cpp
+    third_party/ChanFatFS/src/ff.c
+    third_party/ChanFatFS/src/ffunicode.c
 )
 
 pico_generate_pio_header(pico_skyace ${CMAKE_CURRENT_SOURCE_DIR}/src/platform/lcd_spi_min.pio)
 
-target_include_directories(pico_skyace PRIVATE src)
+target_include_directories(pico_skyace PRIVATE
+    src
+    third_party/ChanFatFS/include
+)
 
 target_compile_options(pico_skyace PRIVATE -O3 -Wall -Wextra)
 target_compile_definitions(pico_skyace PRIVATE
     PICO_SKYACE_VERSION_STRING="${PICO_SKYACE_VERSION}"
     PICO_DEFAULT_UART_BAUD_RATE=115200
+    PICO_STACK_SIZE=0x1000
 )
 
 target_link_libraries(pico_skyace
@@ -48,6 +58,8 @@ target_link_libraries(pico_skyace
     hardware_pio
     hardware_dma
     hardware_i2c
+    hardware_pwm
+    hardware_spi
 )
 
 pico_add_extra_outputs(pico_skyace)

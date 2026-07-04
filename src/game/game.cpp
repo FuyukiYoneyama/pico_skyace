@@ -5,11 +5,14 @@
 #include <cstring>
 
 #include "game/fixed_math.h"
+#include "game/funeral_march.h"
 #include "game/gfx.h"
 #include "pico/stdlib.h"
+#include "platform/picocalc_audio.h"
 #include "platform/picocalc_display.h"
 #include "platform/picocalc_key_table.h"
 #include "platform/picocalc_keyboard.h"
+#include "platform/screenshot_capture.h"
 
 namespace skyace::game {
 namespace {
@@ -287,6 +290,7 @@ Proj project(int32_t wx, int32_t wy, int32_t wz) {
 // ---------------------------------------------------------------- スポーン
 
 void spawn_explosion(int32_t x, int32_t y, int32_t z) {
+    audio::play_sfx(audio::Sfx::Explosion);
     for (auto& e : g_ex) {
         if (!e.active) {
             e.active = true;
@@ -410,6 +414,7 @@ void fire_missile() {
         m.trail_n = 0;
         m.trail_head = 0;
         --g_pl.missiles;
+        audio::play_sfx(audio::Sfx::Missile);
         return;
     }
 }
@@ -459,9 +464,9 @@ void update_player() {
     }
 
     // スロットル
-    if (g_in.down['X']) {
+    if (g_in.down['O']) {
         g_pl.speed_q8 += 80;
-    } else if (g_in.down['C']) {
+    } else if (g_in.down['L']) {
         g_pl.speed_q8 -= 96;
     } else if (g_pl.speed_q8 > 90 * kQ8) {
         g_pl.speed_q8 -= 8;
@@ -473,6 +478,18 @@ void update_player() {
     }
     if (g_pl.speed_q8 > 150 * kQ8) {
         g_pl.speed_q8 = 150 * kQ8;
+    }
+
+    // エンジン音: 速度 45..150 m/s を throttle 0..255 に写像
+    {
+        int32_t throttle = ((g_pl.speed_q8 - 45 * kQ8) * 255) / (105 * kQ8);
+        if (throttle < 0) {
+            throttle = 0;
+        }
+        if (throttle > 255) {
+            throttle = 255;
+        }
+        audio::set_engine(static_cast<uint8_t>(throttle));
     }
 
     // 移動
@@ -512,9 +529,10 @@ void update_player() {
     if (g_pl.gun_flash > 0) {
         --g_pl.gun_flash;
     }
-    if (g_in.down['Z'] && g_pl.gun_cd == 0) {
+    if (g_in.down[keys::Space] && g_pl.gun_cd == 0) {
         g_pl.gun_cd = 3;
         g_pl.gun_flash = 3;
+        audio::play_sfx(audio::Sfx::Gun);
         for (int i = 0; i < kMaxEnemies; ++i) {
             Enemy& e = g_en[i];
             if (!e.alive || !e.vis) {
@@ -559,6 +577,9 @@ void update_player() {
         if (g_pl.lock_target == best) {
             if (g_pl.lock_timer < 60) {
                 ++g_pl.lock_timer;
+                if (g_pl.lock_timer == 20) {
+                    audio::play_sfx(audio::Sfx::LockOn);
+                }
             }
         } else {
             g_pl.lock_target = best;
@@ -570,7 +591,7 @@ void update_player() {
     }
 
     // ミサイル発射
-    if (g_in.pressed[keys::Space]) {
+    if (g_in.pressed['M']) {
         fire_missile();
     }
 
@@ -692,6 +713,7 @@ void update_enemy(int idx) {
             if ((fm::rnd() % 10) < 6) {  // 命中率 60%
                 g_pl.hp -= 7;
                 g_pl.dmg_flash = 8;
+                audio::play_sfx(audio::Sfx::Hit);
                 set_msg("TAKING FIRE!");
                 if (g_pl.hp <= 0) {
                     g_pl.hp = 0;
@@ -810,6 +832,9 @@ void update_play() {
 
     if (g_pl.hp <= 0) {
         g_mode = Mode::GameOver;
+        audio::set_engine(0);
+        audio::music_play(funeral_march::kMelodyNotes, funeral_march::kMelodyNotesCount,
+                          funeral_march::kBassNotes, funeral_march::kBassNotesCount, true);
         return;
     }
 
@@ -1291,9 +1316,9 @@ void render_title() {
               "PICOCALC AIR COMBAT", kColHudGreen);
 
     gfx::text(24, 64, "ARROWS : STEER", kColWhite);
-    gfx::text(24, 72, "SPACE  : MISSILE", kColWhite);
-    gfx::text(24, 80, "Z      : GUN", kColWhite);
-    gfx::text(24, 88, "X / C  : THROTTLE", kColWhite);
+    gfx::text(24, 72, "SPACE  : GUN", kColWhite);
+    gfx::text(24, 80, "M      : MISSILE", kColWhite);
+    gfx::text(24, 88, "O / L  : THROTTLE", kColWhite);
 
     if (g_frame & 8) {
         gfx::text(kCx - gfx::text_width("PRESS ENTER", 2) / 2, 140,
@@ -1326,11 +1351,21 @@ void run() {
     fm::init();
     init_mirrored_art();
     g_pl.y = 600 * kQ8;
+    audio::music_play(funeral_march::kMelodyNotes, funeral_march::kMelodyNotesCount,
+                      funeral_march::kBassNotes, funeral_march::kBassNotesCount, true);
 
     absolute_time_t next_frame = make_timeout_time_ms(kFrameMs);
     while (true) {
         g_in.begin_frame();
         g_in.poll();
+
+        // F5: 現在のフレームバッファを SD カードの /screenshots/ に BMP で
+        // 保存する。SD書き込みの間はゲームループが止まるが、ユーザー要望通り
+        // 許容する（同期処理でそれ以外を複雑にしない）。
+        if (g_in.pressed[keys::F5]) {
+            screenshot::capture(gfx::fb(), gfx::kWidth, gfx::kHeight);
+            next_frame = make_timeout_time_ms(kFrameMs);
+        }
 
         switch (g_mode) {
             case Mode::Title:
@@ -1338,12 +1373,18 @@ void run() {
                 if (g_in.pressed[keys::Enter]) {
                     reset_game();
                     g_mode = Mode::Play;
+                    audio::music_stop();
                 }
                 render_title();
                 break;
             case Mode::Play:
                 if (g_in.pressed[keys::Escape]) {
                     g_mode = Mode::Title;
+                    audio::set_engine(0);
+                    audio::music_play(funeral_march::kMelodyNotes,
+                                      funeral_march::kMelodyNotesCount,
+                                      funeral_march::kBassNotes,
+                                      funeral_march::kBassNotesCount, true);
                     break;
                 }
                 update_play();

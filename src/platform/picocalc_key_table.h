@@ -19,6 +19,7 @@ constexpr uint8_t Enter = 0x0a;
 constexpr uint8_t ButtonLeft2 = 0x11;
 constexpr uint8_t ButtonRight2 = 0x12;
 constexpr uint8_t Space = 0x20;
+constexpr uint8_t F5 = 0x85;
 constexpr uint8_t Escape = 0xb1;
 constexpr uint8_t Left = 0xb4;
 constexpr uint8_t Up = 0xb5;

@@ -4,6 +4,7 @@
 #include "game/game.h"
 #include "hardware/clocks.h"
 #include "pico/stdlib.h"
+#include "platform/picocalc_audio.h"
 #include "platform/picocalc_display.h"
 #include "platform/picocalc_keyboard.h"
 
@@ -29,6 +30,7 @@ int main() {
 
     skyace::display::init();
     skyace::keyboard::init();
+    skyace::audio::init();
 
     // SD ローダー経由の起動では前のプログラムがバックライトを暗く/消して
     // いる場合があり、コードは正しく描画していても画面が真っ黒に見える。

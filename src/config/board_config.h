@@ -24,6 +24,10 @@ constexpr unsigned kKeyboardI2cScl = 7;
 constexpr uint32_t kKeyboardI2cHz = 400 * 1000;
 constexpr uint8_t kKeyboardI2cAddress = 0x1f;
 
+// general/03_AUDIO_PWM.md: 回路図 V2.0 準拠。左右とも実機で発音実績あり。
+constexpr unsigned kAudioPwmLeft = 26;
+constexpr unsigned kAudioPwmRight = 27;
+
 // general/lcd/src/lcd_rgb565_pio.cpp（2026-07-04 実機動作確認済み）と同じ値。
 // 250 MHz sysclk / (2 * kPioClkDiv) = 62.5 MHz 相当。
 constexpr uint32_t kSysClockKhz = 250000;
