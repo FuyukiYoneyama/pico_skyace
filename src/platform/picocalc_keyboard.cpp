@@ -61,10 +61,12 @@ bool read_event(KeyEvent* event) {
     return event->key != 0;
 }
 
-void set_backlight(uint8_t level) {
+bool set_backlight(uint8_t level) {
     uint8_t data[2] = {static_cast<uint8_t>(kRegBacklight | kWriteMask), level};
     const int written = i2c_write_blocking(i2c1, board::kKeyboardI2cAddress, data, 2, false);
-    std::printf("BACKLIGHT set level=%u ok=%d\n", level, written == 2);
+    const bool ok = written == 2;
+    std::printf("BACKLIGHT set level=%u ok=%d\n", level, ok);
+    return ok;
 }
 
 uint8_t read_backlight() {

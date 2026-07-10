@@ -25,8 +25,9 @@ repeating_timer_t g_timer;
 volatile uint8_t g_throttle = 0;
 uint32_t g_engine_phase = 0;
 
-// --- BGM（音符列を順に再生するチャンネル）。pico_rescue の rescue_bgm.cpp と
-// 同じく、旋律・低音の2声を独立に進行させて同時にミックスする。 ---
+// --- BGM（音符列を順に再生するチャンネル）。ソプラノ・アルト・テノール・
+// バスの4声を独立に進行させて同時にミックスする（同時発音数を増やすための
+// 拡張）。 ---
 struct MusicVoiceState {
     const MusicNote* notes = nullptr;
     volatile int count = 0;
@@ -38,6 +39,8 @@ struct MusicVoiceState {
     int32_t amplitude = 60;
 };
 MusicVoiceState g_voice_melody;
+MusicVoiceState g_voice_alto;
+MusicVoiceState g_voice_tenor;
 MusicVoiceState g_voice_bass;
 
 void music_voice_advance(MusicVoiceState* v) {
@@ -153,6 +156,8 @@ bool timer_callback(repeating_timer_t*) {
     }
 
     mix += music_voice_render(&g_voice_melody);
+    mix += music_voice_render(&g_voice_alto);
+    mix += music_voice_render(&g_voice_tenor);
     mix += music_voice_render(&g_voice_bass);
 
     if (mix > 127) {
@@ -211,20 +216,36 @@ void set_engine(uint8_t throttle) {
 }
 
 void music_play(const MusicNote* melody, int melody_count,
+                const MusicNote* alto, int alto_count,
+                const MusicNote* tenor, int tenor_count,
                 const MusicNote* bass, int bass_count, bool loop) {
     const uint32_t save = save_and_disable_interrupts();
     g_voice_melody = MusicVoiceState{};
     g_voice_melody.notes = melody;
     g_voice_melody.count = melody_count;
     g_voice_melody.loop = loop;
-    g_voice_melody.amplitude = 60;
+    g_voice_melody.amplitude = 55;
     g_voice_melody.active = (melody != nullptr && melody_count > 0);
+
+    g_voice_alto = MusicVoiceState{};
+    g_voice_alto.notes = alto;
+    g_voice_alto.count = alto_count;
+    g_voice_alto.loop = loop;
+    g_voice_alto.amplitude = 38;
+    g_voice_alto.active = (alto != nullptr && alto_count > 0);
+
+    g_voice_tenor = MusicVoiceState{};
+    g_voice_tenor.notes = tenor;
+    g_voice_tenor.count = tenor_count;
+    g_voice_tenor.loop = loop;
+    g_voice_tenor.amplitude = 36;
+    g_voice_tenor.active = (tenor != nullptr && tenor_count > 0);
 
     g_voice_bass = MusicVoiceState{};
     g_voice_bass.notes = bass;
     g_voice_bass.count = bass_count;
     g_voice_bass.loop = loop;
-    g_voice_bass.amplitude = 50;
+    g_voice_bass.amplitude = 46;
     g_voice_bass.active = (bass != nullptr && bass_count > 0);
     restore_interrupts(save);
 }
@@ -232,6 +253,8 @@ void music_play(const MusicNote* melody, int melody_count,
 void music_stop() {
     const uint32_t save = save_and_disable_interrupts();
     g_voice_melody.active = false;
+    g_voice_alto.active = false;
+    g_voice_tenor.active = false;
     g_voice_bass.active = false;
     restore_interrupts(save);
 }

@@ -37,8 +37,8 @@ clkdiv=2.0 で約6.5ms）連続送信すると、このパネル/配線では同
 
 ### 決定的な比較
 
-`general/lcd/src/lcd_rgb565_pio.cpp`（2026-07-04 実機動作確認済み）と、
-自前で書いた実装は、**どちらも320×320を160×160の4象限に分けて `set_window`**
+著者の他プロジェクトで実機動作確認済みの実装と、自前で書いた実装は、
+**どちらも320×320を160×160の4象限に分けて `set_window`**
 しており、粒度は同じだった。違いはただ1点:
 
 | | 自前実装（動かなかった） | `lcd_rgb565_pio_write_blocking()`（動いた） |
@@ -54,9 +54,10 @@ clkdiv=2.0 で約6.5ms）連続送信すると、このパネル/配線では同
 
 ### 対策
 
-独自の再実装をやめ、`general/lcd/src/lcd_rgb565_pio.cpp` / `.h` /
-`lcd_spi_min.pio` を**無改変でコピー**して使うことにした
-（`src/platform/lcd_rgb565_pio.cpp` 等）。`src/platform/picocalc_display.cpp` は
+独自の再実装をやめ、著者の他プロジェクトで実機検証済みの
+`lcd_rgb565_pio.cpp` / `.h` / `lcd_spi_min.pio` を**無改変でコピー**して
+使うことにした（`src/platform/lcd_rgb565_pio.cpp` 等）。
+`src/platform/picocalc_display.cpp` は
 このファイルの `lcd_rgb565_pio_init()` / `lcd_rgb565_pio_set_window()` /
 `lcd_rgb565_pio_write_blocking()` / `lcd_rgb565_pio_fill_rect_blocking()` を
 呼ぶだけの薄いアダプタにした。
@@ -67,7 +68,7 @@ clkdiv=2.0 で約6.5ms）連続送信すると、このパネル/配線では同
 インターフェース、p.53）に、書き込み時のシリアルクロック最小周期
 `TSCYCW = 66ns`（＝ SCL 最大周波数 仕様上 約15.15MHz）という記載がある。
 
-このリポジトリの実装（`nes2`、`general/lcd`、`life` 系すべて含め本プロジェクトも）は
+著者の他の RP2040/PicoCalc プロジェクトも含め、本プロジェクトは
 `clkdiv=2.0`（sysclk 250MHz で実効 **62.5MHz**）を使っており、**仕様上限の
 約4倍でオーバークロック**している。データシートに「連続何バイトまで」という
 直接の上限記載はないが、仕様外の高クロックで動かしている以上、CSを長時間

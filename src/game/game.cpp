@@ -5,8 +5,9 @@
 #include <cstring>
 
 #include "game/fixed_math.h"
-#include "game/funeral_march.h"
+#include "game/bgm_track.h"
 #include "game/gfx.h"
+#include "hardware/watchdog.h"
 #include "pico/stdlib.h"
 #include "platform/picocalc_audio.h"
 #include "platform/picocalc_display.h"
@@ -102,6 +103,7 @@ struct Player {
 };
 
 enum class EnemyMode : uint8_t { Cruise, Turn, Attack, Evade };
+enum class EnemyType : uint8_t { Fighter, Bomber, Interceptor };
 
 struct Enemy {
     bool alive;
@@ -110,6 +112,7 @@ struct Enemy {
     int32_t speed_q8;
     int hp;
     EnemyMode mode;
+    EnemyType type;
     int8_t turn_dir;
     int16_t timer;
     int16_t fire_cd;
@@ -119,6 +122,51 @@ struct Enemy {
     int32_t zc;
     int pixw;
 };
+
+// 敵タイプ別のパラメータ。Fighter が既存のバランス、Bomber は低速・高耐久・
+// 回避しない（missileで狙いやすいがgunでは削りにくい大型機）、Interceptor は
+// 高速・低耐久・高命中率（gunで落としやすいが被弾しやすい）という役割分担。
+struct EnemyStats {
+    int hp;
+    int32_t speed_min, speed_max;  // m/s
+    int score;
+    int16_t fire_cd;    // 射撃後のクールダウン（フレーム）
+    int hit_pct;        // 命中率 %
+    int player_dmg;
+    int collision_dmg;
+    int32_t wingspan_m;  // 描画スケール計算用の見かけの機体サイズ
+    bool can_evade;
+    int attack_bias;    // モード抽選での Attack 優先度（%pt 加算）
+};
+
+EnemyStats enemy_stats(EnemyType type) {
+    switch (type) {
+        case EnemyType::Bomber:
+            return {180, 40, 55, 200, 40, 45, 10, 45, 19, false, -20};
+        case EnemyType::Interceptor:
+            return {60, 100, 130, 150, 18, 70, 6, 25, 11, true, 25};
+        case EnemyType::Fighter:
+        default:
+            return {100, 60, 90, 100, 26, 60, 7, 30, 14, true, 0};
+    }
+}
+
+EnemyType pick_enemy_type(int wave) {
+    if (wave <= 1) {
+        return EnemyType::Fighter;
+    }
+    const uint32_t r = fm::rnd() % 100;
+    if (wave == 2) {
+        return r < 70 ? EnemyType::Fighter : EnemyType::Bomber;
+    }
+    if (r < 45) {
+        return EnemyType::Fighter;
+    }
+    if (r < 75) {
+        return EnemyType::Bomber;
+    }
+    return EnemyType::Interceptor;
+}
 
 struct Missile {
     bool active;
@@ -230,11 +278,45 @@ uint16_t plane_palette(char c) {
     }
 }
 
-uint16_t enemy_palette(char c) {
+uint16_t enemy_palette_fighter(char c) {
     switch (c) {
         case 'X': return gfx::rgb(70, 66, 78);
         case 'R': return gfx::rgb(255, 60, 60);
         default: return gfx::rgb(70, 66, 78);
+    }
+}
+
+uint16_t enemy_palette_bomber(char c) {
+    switch (c) {
+        case 'X': return gfx::rgb(74, 82, 58);
+        case 'R': return gfx::rgb(255, 170, 40);
+        default: return gfx::rgb(74, 82, 58);
+    }
+}
+
+uint16_t enemy_palette_interceptor(char c) {
+    switch (c) {
+        case 'X': return gfx::rgb(60, 84, 100);
+        case 'R': return gfx::rgb(80, 210, 255);
+        default: return gfx::rgb(60, 84, 100);
+    }
+}
+
+gfx::PaletteFn enemy_palette_fn(EnemyType type) {
+    switch (type) {
+        case EnemyType::Bomber: return enemy_palette_bomber;
+        case EnemyType::Interceptor: return enemy_palette_interceptor;
+        case EnemyType::Fighter:
+        default: return enemy_palette_fighter;
+    }
+}
+
+uint16_t enemy_radar_color(EnemyType type) {
+    switch (type) {
+        case EnemyType::Bomber: return kColOrange;
+        case EnemyType::Interceptor: return gfx::rgb(80, 210, 255);
+        case EnemyType::Fighter:
+        default: return kColRed;
     }
 }
 
@@ -324,13 +406,16 @@ void spawn_enemy() {
         }
         e.y = alt;
         e.yaw_q8 = static_cast<uint16_t>(fm::rnd() & 0xffff);
-        e.speed_q8 = fm::rnd_range(60, 90) * kQ8;
-        e.hp = 100;
+        e.type = pick_enemy_type(g_wave);
+        const EnemyStats stats = enemy_stats(e.type);
+        e.speed_q8 = fm::rnd_range(stats.speed_min, stats.speed_max) * kQ8;
+        e.hp = stats.hp;
         e.mode = EnemyMode::Cruise;
         e.turn_dir = (fm::rnd() & 1) ? 1 : -1;
         e.timer = static_cast<int16_t>(fm::rnd_range(40, 120));
         e.fire_cd = 30;
         e.vis = false;
+        std::printf("SPAWN wave=%d type=%d\r\n", g_wave, static_cast<int>(e.type));
         return;
     }
 }
@@ -343,6 +428,8 @@ int enemies_for_wave(int wave) {
 void start_wave(int wave) {
     g_wave = wave;
     const int n = enemies_for_wave(wave);
+    std::printf("WAVE START wave=%d enemies=%d frame=%lu\r\n", wave, n,
+               static_cast<unsigned long>(g_frame));
     for (int i = 0; i < n; ++i) {
         spawn_enemy();
     }
@@ -545,8 +632,11 @@ void update_player() {
                 if (e.hp <= 0) {
                     e.alive = false;
                     spawn_explosion(e.x, e.y, e.z);
-                    g_score += 100;
-                    set_msg("ENEMY DOWN +100");
+                    const int reward = enemy_stats(e.type).score;
+                    g_score += reward;
+                    char msg[24];
+                    std::snprintf(msg, sizeof(msg), "ENEMY DOWN +%d", reward);
+                    set_msg(msg);
                 }
                 break;
             }
@@ -628,25 +718,28 @@ void update_enemy(int idx) {
         return;
     }
 
+    const EnemyStats stats = enemy_stats(e.type);
     const int64_t dx = g_pl.x - e.x;
     const int64_t dz = g_pl.z - e.z;
     const uint32_t dist_m = fm::isqrt64(
         static_cast<uint64_t>(dx * dx + dz * dz)) >> 8;
 
-    // ミサイルに狙われたら回避
-    if (e.mode != EnemyMode::Evade && missile_targets(idx)) {
+    // ミサイルに狙われたら回避（Bomber は回避運動をしない鈍重な機体）
+    if (e.mode != EnemyMode::Evade && stats.can_evade && missile_targets(idx)) {
         e.mode = EnemyMode::Evade;
         e.turn_dir = (fm::rnd() & 1) ? 1 : -1;
         e.timer = 70;
     }
 
     if (--e.timer <= 0) {
-        // モード遷移
+        // モード遷移（attack_bias で Interceptor は積極的に、Bomber は
+        // 消極的に攻撃態勢へ入る）
         const uint32_t r = fm::rnd() % 100;
+        const int attack_th = 35 + stats.attack_bias;
         if (dist_m > 2500) {
             e.mode = EnemyMode::Attack;  // 離れすぎ → 追跡して戻る
             e.timer = 90;
-        } else if (r < 35 && dist_m < 900) {
+        } else if (static_cast<int>(r) < attack_th && dist_m < 900) {
             e.mode = EnemyMode::Attack;
             e.timer = static_cast<int16_t>(fm::rnd_range(60, 120));
         } else if (r < 65) {
@@ -709,9 +802,9 @@ void update_enemy(int idx) {
             static_cast<int32_t>(dx >> 8), static_cast<int32_t>(dz >> 8));
         const int8_t diff = static_cast<int8_t>(bearing - yaw);
         if (diff > -6 && diff < 6 && e.fire_cd == 0) {
-            e.fire_cd = 26;
-            if ((fm::rnd() % 10) < 6) {  // 命中率 60%
-                g_pl.hp -= 7;
+            e.fire_cd = stats.fire_cd;
+            if (static_cast<int>(fm::rnd() % 100) < stats.hit_pct) {
+                g_pl.hp -= stats.player_dmg;
                 g_pl.dmg_flash = 8;
                 audio::play_sfx(audio::Sfx::Hit);
                 set_msg("TAKING FIRE!");
@@ -729,9 +822,9 @@ void update_enemy(int idx) {
     if (d2 < rr) {
         e.alive = false;
         spawn_explosion(e.x, e.y, e.z);
-        g_pl.hp -= 30;
+        g_pl.hp -= stats.collision_dmg;
         g_pl.dmg_flash = 12;
-        g_score += 50;
+        g_score += stats.score / 2;
         set_msg("MIDAIR COLLISION!");
     }
 }
@@ -799,8 +892,11 @@ void update_missiles() {
                 m.active = false;
                 t.alive = false;
                 spawn_explosion(t.x, t.y, t.z);
-                g_score += 100;
-                set_msg("ENEMY DOWN +100");
+                const int reward = enemy_stats(t.type).score;
+                g_score += reward;
+                char msg[24];
+                std::snprintf(msg, sizeof(msg), "ENEMY DOWN +%d", reward);
+                set_msg(msg);
                 break;
             }
         }
@@ -832,9 +928,13 @@ void update_play() {
 
     if (g_pl.hp <= 0) {
         g_mode = Mode::GameOver;
+        std::printf("MODE Play->GameOver frame=%lu wave=%d score=%d\r\n",
+                   static_cast<unsigned long>(g_frame), g_wave, g_score);
         audio::set_engine(0);
-        audio::music_play(funeral_march::kMelodyNotes, funeral_march::kMelodyNotesCount,
-                          funeral_march::kBassNotes, funeral_march::kBassNotesCount, true);
+        audio::music_play(bgm::kMelodyNotes, bgm::kMelodyNotesCount,
+                          bgm::kAltoNotes, bgm::kAltoNotesCount,
+                          bgm::kTenorNotes, bgm::kTenorNotesCount,
+                          bgm::kBassNotes, bgm::kBassNotesCount, true);
         return;
     }
 
@@ -1034,8 +1134,9 @@ void render_entities() {
         e.sx = p.sx;
         e.sy = p.sy;
         e.zc = p.zc;
+        const int32_t wingspan_m = enemy_stats(e.type).wingspan_m;
         e.pixw = static_cast<int>(
-            (static_cast<int64_t>(14 * kFocal) * kQ8) / p.zc);
+            (static_cast<int64_t>(wingspan_m * kFocal) * kQ8) / p.zc);
         items[n++] = {p.zc, 0, static_cast<uint8_t>(i), p.sx, p.sy};
     }
     for (int i = 0; i < kMaxMissiles; ++i) {
@@ -1083,7 +1184,8 @@ void render_entities() {
                 } else {
                     const int scale_q8 = e.pixw * 256 / 13;
                     gfx::art(kEnemyArt, kEnemyRows, it.sx, it.sy,
-                             scale_q8 > 640 ? 640 : scale_q8, enemy_palette);
+                             scale_q8 > 640 ? 640 : scale_q8,
+                             enemy_palette_fn(e.type));
                 }
                 break;
             }
@@ -1232,7 +1334,7 @@ void render_hud() {
             if (zr > rr - 2) {
                 zr = rr - 2;
             }
-            gfx::put_pixel(rx + xr, ry - zr, kColRed);
+            gfx::put_pixel(rx + xr, ry - zr, enemy_radar_color(e.type));
         }
     }
 
@@ -1306,7 +1408,7 @@ void render_title() {
     // 飛び回る敵機シルエット
     const int ex = static_cast<int>((g_frame * 2) % 220) - 30;
     const int ey = 52 + static_cast<int>((g_frame / 5) % 9);
-    gfx::art(kEnemyArt, kEnemyRows, ex, ey, 300, enemy_palette);
+    gfx::art(kEnemyArt, kEnemyRows, ex, ey, 300, enemy_palette_fighter);
 
     gfx::art(kPlaneLevel, kPlaneRows, kCx, 118, 400, plane_palette);
 
@@ -1351,11 +1453,16 @@ void run() {
     fm::init();
     init_mirrored_art();
     g_pl.y = 600 * kQ8;
-    audio::music_play(funeral_march::kMelodyNotes, funeral_march::kMelodyNotesCount,
-                      funeral_march::kBassNotes, funeral_march::kBassNotesCount, true);
+    audio::music_play(bgm::kMelodyNotes, bgm::kMelodyNotesCount,
+                      bgm::kAltoNotes, bgm::kAltoNotesCount,
+                      bgm::kTenorNotes, bgm::kTenorNotesCount,
+                      bgm::kBassNotes, bgm::kBassNotesCount, true);
 
     absolute_time_t next_frame = make_timeout_time_ms(kFrameMs);
     while (true) {
+        // フリーズ検知用ウォッチドッグ（general/11_TIMING.md §6）。
+        watchdog_update();
+
         g_in.begin_frame();
         g_in.poll();
 
@@ -1374,6 +1481,8 @@ void run() {
                     reset_game();
                     g_mode = Mode::Play;
                     audio::music_stop();
+                    std::printf("MODE Title->Play frame=%lu\r\n",
+                               static_cast<unsigned long>(g_frame));
                 }
                 render_title();
                 break;
@@ -1381,10 +1490,16 @@ void run() {
                 if (g_in.pressed[keys::Escape]) {
                     g_mode = Mode::Title;
                     audio::set_engine(0);
-                    audio::music_play(funeral_march::kMelodyNotes,
-                                      funeral_march::kMelodyNotesCount,
-                                      funeral_march::kBassNotes,
-                                      funeral_march::kBassNotesCount, true);
+                    std::printf("MODE Play->Title(esc) frame=%lu\r\n",
+                               static_cast<unsigned long>(g_frame));
+                    audio::music_play(bgm::kMelodyNotes,
+                                      bgm::kMelodyNotesCount,
+                                      bgm::kAltoNotes,
+                                      bgm::kAltoNotesCount,
+                                      bgm::kTenorNotes,
+                                      bgm::kTenorNotesCount,
+                                      bgm::kBassNotes,
+                                      bgm::kBassNotesCount, true);
                     break;
                 }
                 update_play();

@@ -20,10 +20,13 @@ struct MusicNote {
     uint16_t freq_hz;
     uint16_t duration_ms;
 };
-// BGM 再生。ゲームの効果音・エンジン音とは別の2チャンネル（旋律+低音）として
-// ミックスする（pico_rescue の rescue_bgm.cpp と同じく2声構成）。
-// bass が nullptr の場合は旋律のみを鳴らす。
+// BGM 再生。ゲームの効果音・エンジン音とは別の4チャンネル
+// （ソプラノ+アルト+テノール+バス）としてミックスする（同時発音数を増やす
+// ため pico_rescue の2声構成から拡張）。alto/tenor/bass が nullptr の場合は
+// その声部を鳴らさない。
 void music_play(const MusicNote* melody, int melody_count,
+                const MusicNote* alto, int alto_count,
+                const MusicNote* tenor, int tenor_count,
                 const MusicNote* bass, int bass_count, bool loop);
 void music_stop();
 
