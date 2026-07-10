@@ -931,10 +931,11 @@ void update_play() {
         std::printf("MODE Play->GameOver frame=%lu wave=%d score=%d\r\n",
                    static_cast<unsigned long>(g_frame), g_wave, g_score);
         audio::set_engine(0);
-        audio::music_play(bgm::kMelodyNotes, bgm::kMelodyNotesCount,
-                          bgm::kAltoNotes, bgm::kAltoNotesCount,
-                          bgm::kTenorNotes, bgm::kTenorNotesCount,
-                          bgm::kBassNotes, bgm::kBassNotesCount, true);
+        audio::music_play(bgm::kLeadNotes, bgm::kLeadNotesCount,
+                          bgm::kArpNotes, bgm::kArpNotesCount,
+                          bgm::kChordNotes, bgm::kChordNotesCount,
+                          bgm::kBassNotes, bgm::kBassNotesCount,
+                          bgm::kDrumNotes, bgm::kDrumNotesCount, true);
         return;
     }
 
@@ -1453,14 +1454,15 @@ void run() {
     fm::init();
     init_mirrored_art();
     g_pl.y = 600 * kQ8;
-    audio::music_play(bgm::kMelodyNotes, bgm::kMelodyNotesCount,
-                      bgm::kAltoNotes, bgm::kAltoNotesCount,
-                      bgm::kTenorNotes, bgm::kTenorNotesCount,
-                      bgm::kBassNotes, bgm::kBassNotesCount, true);
+    audio::music_play(bgm::kLeadNotes, bgm::kLeadNotesCount,
+                      bgm::kArpNotes, bgm::kArpNotesCount,
+                      bgm::kChordNotes, bgm::kChordNotesCount,
+                      bgm::kBassNotes, bgm::kBassNotesCount,
+                      bgm::kDrumNotes, bgm::kDrumNotesCount, true);
 
     absolute_time_t next_frame = make_timeout_time_ms(kFrameMs);
     while (true) {
-        // フリーズ検知用ウォッチドッグ（general/11_TIMING.md §6）。
+        // フリーズ検知用ウォッチドッグ。
         watchdog_update();
 
         g_in.begin_frame();
@@ -1492,14 +1494,16 @@ void run() {
                     audio::set_engine(0);
                     std::printf("MODE Play->Title(esc) frame=%lu\r\n",
                                static_cast<unsigned long>(g_frame));
-                    audio::music_play(bgm::kMelodyNotes,
-                                      bgm::kMelodyNotesCount,
-                                      bgm::kAltoNotes,
-                                      bgm::kAltoNotesCount,
-                                      bgm::kTenorNotes,
-                                      bgm::kTenorNotesCount,
+                    audio::music_play(bgm::kLeadNotes,
+                                      bgm::kLeadNotesCount,
+                                      bgm::kArpNotes,
+                                      bgm::kArpNotesCount,
+                                      bgm::kChordNotes,
+                                      bgm::kChordNotesCount,
                                       bgm::kBassNotes,
-                                      bgm::kBassNotesCount, true);
+                                      bgm::kBassNotesCount,
+                                      bgm::kDrumNotes,
+                                      bgm::kDrumNotesCount, true);
                     break;
                 }
                 update_play();

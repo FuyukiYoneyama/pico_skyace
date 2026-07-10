@@ -17,17 +17,16 @@ int main() {
     const bool watchdog_reboot = watchdog_caused_reboot();
 
     const bool clock_ok = set_sys_clock_khz(skyace::board::kSysClockKhz, true);
-    // life/synth と同じ手順: クロック変更の直後に PIO/LCD へ触りにいくのではなく、
-    // 新しい clk_sys が完全に安定するまで猶予を置く。ここが「PIO とクロックの
-    // 整合性」で唯一 life と違っていた点（life は set_sys_clock_khz の直後に
-    // 100ms 待ってから display::init() を呼んでいる）。
+    // クロック変更の直後に PIO/LCD へ触りにいくのではなく、新しい clk_sys が
+    // 完全に安定するまで猶予を置く（set_sys_clock_khz の直後に 100ms 待って
+    // から display::init() を呼ぶ）。
     stdio_init_all();
     sleep_ms(100);
 
     std::printf("pico_skyace version %s\r\n", PICO_SKYACE_VERSION_STRING);
     std::printf("BUILD ID time=\"%s %s\"\r\n", __DATE__, __TIME__);
-    // ハング/フリーズ切り分け用（general/11_TIMING.md §6）。前回起動が
-    // ウォッチドッグ復帰なら、画面が固まって自動リセットされたことが分かる。
+    // ハング/フリーズ切り分け用。前回起動がウォッチドッグ復帰なら、
+    // 画面が固まって自動リセットされたことが分かる。
     std::printf("WATCHDOG_CAUSED_REBOOT=%d\r\n", watchdog_reboot ? 1 : 0);
     std::printf("set_sys_clock_khz(%lu) ok=%d sysclk=%lu kHz\r\n",
                 static_cast<unsigned long>(skyace::board::kSysClockKhz),
@@ -56,7 +55,7 @@ int main() {
         std::printf("BACKLIGHT retry=%d ok=%d\r\n", retry, backlight_ok);
     }
 
-    // ハング対策ウォッチドッグ（general/11_TIMING.md §6）。ゲームループが
+    // ハング対策ウォッチドッグ。ゲームループが
     // 3 秒以内に watchdog_update() を呼べなければ自動リセットする。バグの
     // 根本解決ではなく、次回起動ログで「フリーズして自動復帰した」ことを
     // 判別するための保険。

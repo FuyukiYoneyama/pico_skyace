@@ -11,8 +11,10 @@ PicoCalc（RP2040 標準構成）向けの、初代エースコンバット風�
 - ウェーブ制（全滅で次ウェーブ、敵数が増える）。ウェーブが進むと敵タイプが
   増える: Fighter（標準）、Bomber（低速・高耐久・回避しない大型機）、
   Interceptor（高速・低耐久・高命中率）
-- 8kHz IRQ ミキシングによるノイズ入り効果音・エンジン音・4声BGM（ムソルグスキー
-  「展覧会の絵」より キーウの大門）
+- 8kHz IRQ ミキシングによるノイズ入り効果音・エンジン音・5チャンネルの
+  チップチューン風BGM（リード/アルペジオ/ブラス/ベース + 合成ドラム。
+  チャンネルごとにデューティ比・エンベロープを変え、リードにはビブラート、
+  ドラムはキック/スネア/ハット/クラッシュ/タムをノイズと矩形波で合成）
 - F5 キーで SD カードに BMP スクリーンショットを保存
 - 約 30fps（sysclk 250 MHz、LCD 62.5 MHz SPI 相当）
 
@@ -119,20 +121,8 @@ third_party/
 
 - `third_party/ChanFatFS/`: [ChaN 氏の FatFs](http://elm-chan.org/fsw/ff/00index_e.html)。
   BSD 系の独自ライセンス（[LICENSE.txt](third_party/ChanFatFS/LICENSE.txt) 参照）。
-- BGM（`src/game/bgm_track.h`）の原曲は Modest Mussorgsky 作曲「展覧会の絵」
-  より第10曲「キーウの大門」（作曲者は1881年没、原曲自体はパブリックドメイン）。
-  元 MIDI ファイルは第9曲「バーバ・ヤガーの小屋」と第10曲が連結された約9分の
-  ファイルで、ノート密度（音数/秒）の変化から大門の主題が始まる位置
-  （約344秒付近）を特定し、そこから110秒を抽出している。使用した MIDI 演奏
-  データは
-  [音楽の素材館 by MIDI Classics（Windy softmedia service）](https://windy-vis.com/art/download/index.html)
-  （[該当ページ](https://windy-vis.com/cgi/fnavi/clsnavi.cgi?links=652)）の
-  著作物であり、演奏データ自体はパブリックドメインではない。同サイトの規約に
-  従い、個人・非商業目的（ゲームでの利用を含む）はクレジット表記を条件に
-  無償利用可、大規模な商業利用には別途有料ライセンスが必要、MIDI ファイル
-  そのものの再配布は禁止。**本リポジトリは MIDI ファイル自体を含まず**、
-  そこから著者が機械的に抽出した音符列（周波数/長さのみ、`bgm_track.h`）
-  だけを含む。本プロジェクトを商用利用したい場合は、この BGM 部分を別音源に
-  差し替えること。
+- BGM（`src/game/bgm_track.h`）は、本プロジェクト用に初代エースコンバット風の
+  雰囲気で用意されたオリジナル曲の MIDI からノートデータを機械的に抽出・生成
+  したもの。既存ゲームの楽曲データの複製・採譜ではない。
 - ビルドには [Raspberry Pi Pico SDK](https://github.com/raspberrypi/pico-sdk)
   （BSD-3-Clause）が必要（本リポジトリには含まれない）。

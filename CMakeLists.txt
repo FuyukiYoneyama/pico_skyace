@@ -60,6 +60,7 @@ target_link_libraries(pico_skyace
     hardware_i2c
     hardware_pwm
     hardware_spi
+    hardware_watchdog
 )
 
 pico_add_extra_outputs(pico_skyace)

@@ -1,8 +1,7 @@
 // このファイルは薄いアダプタに徹する。実際の LCD 制御は
-// platform/lcd_rgb565_pio.cpp（general/lcd/src/lcd_rgb565_pio.cpp を
-// 無改変でコピーしたもの。2026-07-04 実機動作確認済み）が行う。
-// 独自の再実装をやめ、検証済みファイルをそのまま呼ぶことで、書き写しミスの
-// 可能性を排除する。
+// platform/lcd_rgb565_pio.cpp（著者の他プロジェクトで実機動作確認済みの
+// 実装を無改変でコピーしたもの）が行う。独自の再実装をやめ、検証済み
+// ファイルをそのまま呼ぶことで、書き写しミスの可能性を排除する。
 #include "platform/picocalc_display.h"
 
 #include <cstdio>
@@ -12,7 +11,7 @@
 namespace skyace::display {
 
 void init() {
-    lcd_rgb565_pio_init(false);  // DMA なし。general/lcd の lcd_pio_blocking_rgb565 と同じ
+    lcd_rgb565_pio_init(false);  // DMA なし。参照実装の blocking モードと同じ
     std::printf("DISPLAY init ok (verified lcd_rgb565_pio driver, blocking mode)\n");
 }
 
@@ -20,7 +19,7 @@ void clear_black() {
     lcd_rgb565_pio_fill_rect_blocking(0, 0, kPanelWidth, kPanelHeight, 0x0000);
 }
 
-// general/lcd の draw_quadrants_blocking() と全く同じ粒度・全く同じ呼び出し
+// 参照実装の draw_quadrants_blocking() と全く同じ粒度・全く同じ呼び出し
 // パターン（160x160 の 4 象限、各象限は 1 回の set_window の後に行ごとの
 // write_blocking）で転送する。象限の並び・サイズ・呼び出し順序も同一。
 void present_scaled2x(const uint16_t* frame) {

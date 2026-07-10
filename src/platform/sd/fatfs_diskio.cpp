@@ -1,5 +1,5 @@
-// game/pico_rescue の fatfs_diskio.cpp を skyace::sdcard へ橋渡しするよう
-// 名前空間だけ変えて移植したもの。
+// 著者の別プロジェクトの fatfs_diskio.cpp を skyace::sdcard へ橋渡しする
+// よう名前空間だけ変えて移植したもの。
 #include "ff.h"
 #include "diskio.h"
 #include "platform/sd/picocalc_sdcard.h"

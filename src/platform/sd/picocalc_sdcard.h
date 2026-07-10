@@ -1,6 +1,6 @@
-// SPI0 経由の生ブロック SD カードドライバ。game/pico_rescue の
-// src/platform/sd/picocalc_sdcard.h（実機動作確認済み）を、名前空間だけ
-// skyace 用に変えて移植したもの。プロトコル部分は無改変。
+// SPI0 経由の生ブロック SD カードドライバ。著者の別プロジェクトの
+// 実機動作確認済み実装を、名前空間だけ skyace 用に変えて移植したもの。
+// プロトコル部分は無改変。
 #pragma once
 
 #include <stdbool.h>

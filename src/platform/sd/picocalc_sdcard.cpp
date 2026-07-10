@@ -1,7 +1,6 @@
-// game/pico_rescue の src/platform/sd/picocalc_sdcard.cpp（実機動作確認済み）
-// を、名前空間だけ skyace 用に変えて移植したもの。SPI コマンドシーケンス・
-// タイミングは無改変。ピン(SCK18/MOSI19/MISO16/CS17/DET22, spi0)は
-// general/05_STORAGE_SD.md と一致。
+// 著者の別プロジェクトの実機動作確認済み実装を、名前空間だけ skyace 用に
+// 変えて移植したもの。SPI コマンドシーケンス・タイミングは無改変。
+// ピン構成: SCK=GP18, MOSI=GP19, MISO=GP16, CS=GP17, DET=GP22（spi0）。
 #include "platform/sd/picocalc_sdcard.h"
 
 #include <cstdio>

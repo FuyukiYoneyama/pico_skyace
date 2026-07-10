@@ -4,7 +4,7 @@
 #include <cstdint>
 
 // PWM (GP26/27) による疑似音源。8kHz のタイマー割り込みでサンプルごとに
-// PWM デューティを書き換える方式（general/03_AUDIO_PWM.md の PWM=DAC 方式）。
+// PWM デューティを書き換える「PWM=簡易DAC」方式。
 // 単純な単一周波数の自走発振と違い、LFSR ノイズと矩形波トーンを混ぜて
 // エンベロープで減衰させるため、実機で「ピー」ではなく「ジャッ」「ドッ」
 // 「ゴォー」に近い音になる。ゲームループをブロックしない
@@ -14,20 +14,42 @@ namespace skyace::audio {
 void init();
 
 // BGM の音符列（周波数Hz / 長さms のペア）。freq_hz=0 は休符。
-// アセットは実行時に MIDI 等を解釈せず、ビルド前に変換して同梱する
-// （general/01_DISPLAY_LCD.md §7 のフォント/画像と同じ方針）。
+// アセットは実行時に MIDI 等を解釈せず、ビルド前に変換して同梱する方式
+// （フォント/画像アセットと同じ方針）。
 struct MusicNote {
     uint16_t freq_hz;
     uint16_t duration_ms;
 };
-// BGM 再生。ゲームの効果音・エンジン音とは別の4チャンネル
-// （ソプラノ+アルト+テノール+バス）としてミックスする（同時発音数を増やす
-// ため pico_rescue の2声構成から拡張）。alto/tenor/bass が nullptr の場合は
-// その声部を鳴らさない。
-void music_play(const MusicNote* melody, int melody_count,
-                const MusicNote* alto, int alto_count,
-                const MusicNote* tenor, int tenor_count,
-                const MusicNote* bass, int bass_count, bool loop);
+
+// リズムセクションの打点列。type は下記 DrumType、duration_ms は
+// 次の打点までの間隔（音自体の長さは音色ごとにエンジン側で固定）。
+struct DrumNote {
+    uint8_t type;
+    uint16_t duration_ms;
+};
+enum DrumType : uint8_t {
+    kDrumRest = 0,   // 休符（間隔のみ進める）
+    kDrumKick = 1,   // キック: 150→40Hz の下降スウィープ
+    kDrumSnare = 2,  // スネア: 中域トーン+ノイズ
+    kDrumHat = 3,    // ハイハット: ごく短いノイズ
+    kDrumCrash = 4,  // クラッシュ/オープンハット: 長めのノイズ
+    kDrumTom = 5,    // タム: 130→80Hz の短いスウィープ
+};
+
+// BGM 再生。効果音・エンジン音とは別の5チャンネル構成:
+//   lead  : 主旋律（50%矩形波・ビブラート付き）
+//   arp   : アルペジオ（25%パルス・短いプラック減衰）
+//   chord : 和音スタブ（25%パルス・持続系）
+//   bass  : ベース（50%矩形波）
+//   drums : 合成ドラム（キック/スネア/ハット/クラッシュ/タム）
+// チャンネルごとに音色（デューティ比・エンベロープ・ビブラート）が違うため、
+// 全部同じ矩形波だった旧構成よりバンドらしい鳴りになる。
+// nullptr のチャンネルは鳴らさない。
+void music_play(const MusicNote* lead, int lead_count,
+                const MusicNote* arp, int arp_count,
+                const MusicNote* chord, int chord_count,
+                const MusicNote* bass, int bass_count,
+                const DrumNote* drums, int drums_count, bool loop);
 void music_stop();
 
 // エンジン音（連続）。throttle=0 で停止、255 で最大。速度に応じて毎フレーム

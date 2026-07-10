@@ -10,8 +10,8 @@ namespace skyace::audio {
 namespace {
 
 // PWM は固定 wrap の高速キャリアにして、サンプルごとに duty（=波形の瞬時値）を
-// タイマー割り込みで書き換える「PWM=簡易DAC」方式にする。general/03_AUDIO_PWM.md
-// の表で 250MHz sysclk / wrap 1023 は約244kHzキャリア、耳には聞こえない帯域。
+// タイマー割り込みで書き換える「PWM=簡易DAC」方式にする。
+// 250MHz sysclk / wrap 1023 は約244kHzキャリア、耳には聞こえない帯域。
 constexpr uint16_t kPwmWrap = 1023;
 constexpr uint32_t kSampleRateHz = 8000;
 
@@ -20,14 +20,51 @@ uint g_chan_l = 0;
 uint g_chan_r = 0;
 repeating_timer_t g_timer;
 
+uint16_t g_lfsr = 0xace1u;
+
+// 16bit Galois LFSR によるホワイトノイズ（タップ: x^16+x^14+x^13+x^11+1 相当）。
+inline int32_t next_noise() {
+    const uint16_t bit = static_cast<uint16_t>(
+        ((g_lfsr >> 0) ^ (g_lfsr >> 2) ^ (g_lfsr >> 3) ^ (g_lfsr >> 5)) & 1u);
+    g_lfsr = static_cast<uint16_t>((g_lfsr >> 1) | (bit << 15));
+    return static_cast<int32_t>(g_lfsr & 0xff) - 128;
+}
+
 // --- エンジン（連続音）: スロットルに応じてピッチと音量が変わる矩形波に
 // ノイズを薄く混ぜて排気音っぽくする ---
 volatile uint8_t g_throttle = 0;
 uint32_t g_engine_phase = 0;
 
-// --- BGM（音符列を順に再生するチャンネル）。ソプラノ・アルト・テノール・
-// バスの4声を独立に進行させて同時にミックスする（同時発音数を増やすための
-// 拡張）。 ---
+// --- BGM: 4音程チャンネル（リード/アルペジオ/コード/ベース）+ ドラム。
+// チャンネルごとに音色パラメータ（振幅・デューティ比・エンベロープ・
+// ビブラート）を変えることで、同一波形4本の平板な鳴りを避ける。 ---
+enum VoiceSlot : uint8_t {
+    kVoiceLead = 0,
+    kVoiceArp,
+    kVoiceChord,
+    kVoiceBass,
+    kVoiceCount,
+};
+
+struct VoiceTimbre {
+    int32_t amplitude;
+    uint32_t duty;      // 矩形波の Hi 区間しきい値（0x8000=50%、0x4000=25%）
+    uint8_t env_start;  // 音符頭の音量 (0..255)
+    uint8_t env_end;    // 音符末尾の音量 (0..255)
+    uint16_t pluck_ms;  // >0 ならこの時間で 0 まで減衰する撥弦系（env_* は無視）
+    uint8_t vib_depth;  // ビブラート深さ（0=なし。~3 で約1%のピッチ揺れ）
+};
+
+// リード: 太い50%矩形波+ビブラートで歌わせる。アルペジオ: 25%パルスを
+// 短いプラックで刻んでシーケンサ風に。コード(ブラス系スタブ): 25%パルスの
+// 持続音を薄く。ベース: 50%矩形波で土台。
+constexpr VoiceTimbre kTimbres[kVoiceCount] = {
+    {48, 0x8000u, 235, 150, 0, 3},   // Lead
+    {30, 0x4000u, 255, 0, 80, 0},    // Arp
+    {24, 0x4000u, 200, 110, 0, 0},   // Chord
+    {44, 0x8000u, 235, 120, 0, 0},   // Bass
+};
+
 struct MusicVoiceState {
     const MusicNote* notes = nullptr;
     volatile int count = 0;
@@ -35,13 +72,11 @@ struct MusicVoiceState {
     volatile bool loop = false;
     volatile bool active = false;
     uint32_t samples_left = 0;
+    uint32_t note_total = 0;
     uint32_t phase = 0;
-    int32_t amplitude = 60;
 };
-MusicVoiceState g_voice_melody;
-MusicVoiceState g_voice_alto;
-MusicVoiceState g_voice_tenor;
-MusicVoiceState g_voice_bass;
+MusicVoiceState g_voices[kVoiceCount];
+uint16_t g_vib_phase = 0;  // リード用ビブラート LFO（約5.9Hz）
 
 void music_voice_advance(MusicVoiceState* v) {
     if (!v->notes || v->count <= 0) {
@@ -57,15 +92,16 @@ void music_voice_advance(MusicVoiceState* v) {
         }
     }
     const MusicNote& n = v->notes[v->index];
-    v->samples_left = (kSampleRateHz * n.duration_ms) / 1000u;
-    if (v->samples_left == 0) {
-        v->samples_left = 1;
+    v->note_total = (kSampleRateHz * n.duration_ms) / 1000u;
+    if (v->note_total == 0) {
+        v->note_total = 1;
     }
+    v->samples_left = v->note_total;
     ++v->index;
 }
 
-// ピアノ風に、音符内で減衰させる（アタック直後が一番大きい）。
-int32_t music_voice_render(MusicVoiceState* v) {
+int32_t music_voice_render(int slot) {
+    MusicVoiceState* v = &g_voices[slot];
     if (!v->active) {
         return 0;
     }
@@ -78,18 +114,150 @@ int32_t music_voice_render(MusicVoiceState* v) {
     const MusicNote& n = v->notes[v->index - 1];
     int32_t sample = 0;
     if (n.freq_hz > 0) {
-        const uint32_t step = (static_cast<uint32_t>(n.freq_hz) << 16) / kSampleRateHz;
+        const VoiceTimbre& tb = kTimbres[slot];
+        uint32_t step = (static_cast<uint32_t>(n.freq_hz) << 16) / kSampleRateHz;
+        if (tb.vib_depth > 0) {
+            // 三角波 LFO でピッチを ±(vib_depth/256) 揺らす
+            const uint16_t ph = g_vib_phase;
+            const int32_t tri = (ph < 0x8000u)
+                ? static_cast<int32_t>(ph) - 0x4000
+                : 0xC000 - static_cast<int32_t>(ph);
+            const int32_t adj = (tri * tb.vib_depth) >> 14;  // -depth..+depth
+            step = static_cast<uint32_t>(
+                static_cast<int32_t>(step) +
+                (static_cast<int32_t>(step) * adj) / 256);
+        }
         v->phase += step;
-        const bool high = (v->phase & 0xffffu) < 0x8000u;
-        const int32_t tone = high ? v->amplitude : -v->amplitude;
-        const uint32_t note_total =
-            (kSampleRateHz * static_cast<uint32_t>(n.duration_ms)) / 1000u;
-        const uint32_t env =
-            note_total ? (v->samples_left * 200u) / note_total : 200u;
+        const int32_t tone =
+            ((v->phase & 0xffffu) < tb.duty) ? tb.amplitude : -tb.amplitude;
+        const uint32_t elapsed = v->note_total - v->samples_left;
+        uint32_t env;
+        if (tb.pluck_ms > 0) {
+            const uint32_t pluck_total = (kSampleRateHz * tb.pluck_ms) / 1000u;
+            env = (elapsed >= pluck_total)
+                ? 0u
+                : (255u * (pluck_total - elapsed)) / pluck_total;
+        } else {
+            env = tb.env_start -
+                  ((static_cast<uint32_t>(tb.env_start - tb.env_end) * elapsed) /
+                   v->note_total);
+        }
         sample = (tone * static_cast<int32_t>(env)) / 255;
     }
     --v->samples_left;
     return sample;
+}
+
+// --- ドラム: 打点ごとに短い一発音を合成する。duration_ms は次の打点までの
+// 間隔で、音自体の長さ（length_ms）は音色ごとに固定。 ---
+struct DrumTimbre {
+    uint16_t length_ms;
+    int32_t amplitude;
+};
+// index = DrumType（0=rest は未使用）
+constexpr DrumTimbre kDrumTimbres[6] = {
+    {0, 0},      // rest
+    {70, 56},    // kick
+    {110, 46},   // snare
+    {28, 22},    // closed hat
+    {240, 26},   // crash / open hat
+    {90, 42},    // tom
+};
+
+struct DrumVoiceState {
+    const DrumNote* notes = nullptr;
+    volatile int count = 0;
+    volatile int index = 0;
+    volatile bool loop = false;
+    volatile bool active = false;
+    uint32_t seq_samples_left = 0;  // 次の打点までの残り
+    uint8_t synth_type = 0;         // 今鳴っている一発音の種別
+    uint32_t synth_left = 0;
+    uint32_t synth_total = 0;
+    uint32_t phase = 0;
+};
+DrumVoiceState g_drums;
+
+void drum_advance() {
+    if (!g_drums.notes || g_drums.count <= 0) {
+        g_drums.active = false;
+        return;
+    }
+    if (g_drums.index >= g_drums.count) {
+        if (g_drums.loop) {
+            g_drums.index = 0;
+        } else {
+            g_drums.active = false;
+            return;
+        }
+    }
+    const DrumNote& n = g_drums.notes[g_drums.index];
+    uint32_t seq = (kSampleRateHz * n.duration_ms) / 1000u;
+    if (seq == 0) {
+        seq = 1;
+    }
+    g_drums.seq_samples_left = seq;
+    if (n.type >= 1 && n.type <= 5) {
+        g_drums.synth_type = n.type;
+        g_drums.synth_total =
+            (kSampleRateHz * kDrumTimbres[n.type].length_ms) / 1000u;
+        g_drums.synth_left = g_drums.synth_total;
+        g_drums.phase = 0;
+    }
+    ++g_drums.index;
+}
+
+int32_t drum_render() {
+    if (!g_drums.active) {
+        return 0;
+    }
+    if (g_drums.seq_samples_left == 0) {
+        drum_advance();
+    }
+    if (!g_drums.active) {
+        return 0;
+    }
+    --g_drums.seq_samples_left;
+    if (g_drums.synth_left == 0) {
+        return 0;
+    }
+    const uint8_t type = g_drums.synth_type;
+    const uint32_t total = g_drums.synth_total;
+    const uint32_t elapsed = total - g_drums.synth_left;
+    --g_drums.synth_left;
+    const int32_t amp = kDrumTimbres[type].amplitude;
+    const uint32_t env = (g_drums.synth_left * 255u) / total;
+    int32_t sample = 0;
+    switch (type) {
+        case kDrumKick: {  // 150→40Hz の下降スウィープでドスッという胴鳴り
+            const uint32_t freq = 150u - (110u * elapsed) / total;
+            g_drums.phase += (freq << 16) / kSampleRateHz;
+            sample = ((g_drums.phase & 0xffffu) < 0x8000u) ? amp : -amp;
+            break;
+        }
+        case kDrumSnare: {  // 中域トーン3割+ノイズ7割
+            g_drums.phase += (190u << 16) / kSampleRateHz;
+            const int32_t tone =
+                ((g_drums.phase & 0xffffu) < 0x8000u) ? amp : -amp;
+            const int32_t noise = (next_noise() * amp) / 128;
+            sample = (tone * 70 + noise * 185) / 255;
+            break;
+        }
+        case kDrumHat:
+        case kDrumCrash: {  // ノイズのみ（長さの違いでハット/クラッシュを表現）
+            sample = (next_noise() * amp) / 128;
+            break;
+        }
+        case kDrumTom: {  // 130→80Hz の短いスウィープ
+            const uint32_t freq = 130u - (50u * elapsed) / total;
+            g_drums.phase += (freq << 16) / kSampleRateHz;
+            sample = ((g_drums.phase & 0xffffu) < 0x8000u) ? amp : -amp;
+            break;
+        }
+        default:
+            break;
+    }
+    return (sample * static_cast<int32_t>(env)) / 255;
 }
 
 // --- 単発効果音: トーン(開始→終了周波数のスウィープ)とノイズを混ぜ、
@@ -105,16 +273,6 @@ struct SfxState {
     uint8_t volume;      // 0..255: 開始音量（エンベロープの初期値）
 };
 volatile SfxState g_sfx = {};
-
-uint16_t g_lfsr = 0xace1u;
-
-// 16bit Galois LFSR によるホワイトノイズ（タップ: x^16+x^14+x^13+x^11+1 相当）。
-inline int32_t next_noise() {
-    const uint16_t bit = static_cast<uint16_t>(
-        ((g_lfsr >> 0) ^ (g_lfsr >> 2) ^ (g_lfsr >> 3) ^ (g_lfsr >> 5)) & 1u);
-    g_lfsr = static_cast<uint16_t>((g_lfsr >> 1) | (bit << 15));
-    return static_cast<int32_t>(g_lfsr & 0xff) - 128;
-}
 
 bool timer_callback(repeating_timer_t*) {
     int32_t mix = 0;
@@ -155,10 +313,12 @@ bool timer_callback(repeating_timer_t*) {
         }
     }
 
-    mix += music_voice_render(&g_voice_melody);
-    mix += music_voice_render(&g_voice_alto);
-    mix += music_voice_render(&g_voice_tenor);
-    mix += music_voice_render(&g_voice_bass);
+    g_vib_phase = static_cast<uint16_t>(g_vib_phase + 48);  // 約5.9Hz LFO
+    mix += music_voice_render(kVoiceLead);
+    mix += music_voice_render(kVoiceArp);
+    mix += music_voice_render(kVoiceChord);
+    mix += music_voice_render(kVoiceBass);
+    mix += drum_render();
 
     if (mix > 127) {
         mix = 127;
@@ -215,47 +375,36 @@ void set_engine(uint8_t throttle) {
     g_throttle = throttle;
 }
 
-void music_play(const MusicNote* melody, int melody_count,
-                const MusicNote* alto, int alto_count,
-                const MusicNote* tenor, int tenor_count,
-                const MusicNote* bass, int bass_count, bool loop) {
+void music_play(const MusicNote* lead, int lead_count,
+                const MusicNote* arp, int arp_count,
+                const MusicNote* chord, int chord_count,
+                const MusicNote* bass, int bass_count,
+                const DrumNote* drums, int drums_count, bool loop) {
+    const MusicNote* parts[kVoiceCount] = {lead, arp, chord, bass};
+    const int counts[kVoiceCount] = {lead_count, arp_count, chord_count,
+                                     bass_count};
     const uint32_t save = save_and_disable_interrupts();
-    g_voice_melody = MusicVoiceState{};
-    g_voice_melody.notes = melody;
-    g_voice_melody.count = melody_count;
-    g_voice_melody.loop = loop;
-    g_voice_melody.amplitude = 55;
-    g_voice_melody.active = (melody != nullptr && melody_count > 0);
-
-    g_voice_alto = MusicVoiceState{};
-    g_voice_alto.notes = alto;
-    g_voice_alto.count = alto_count;
-    g_voice_alto.loop = loop;
-    g_voice_alto.amplitude = 38;
-    g_voice_alto.active = (alto != nullptr && alto_count > 0);
-
-    g_voice_tenor = MusicVoiceState{};
-    g_voice_tenor.notes = tenor;
-    g_voice_tenor.count = tenor_count;
-    g_voice_tenor.loop = loop;
-    g_voice_tenor.amplitude = 36;
-    g_voice_tenor.active = (tenor != nullptr && tenor_count > 0);
-
-    g_voice_bass = MusicVoiceState{};
-    g_voice_bass.notes = bass;
-    g_voice_bass.count = bass_count;
-    g_voice_bass.loop = loop;
-    g_voice_bass.amplitude = 46;
-    g_voice_bass.active = (bass != nullptr && bass_count > 0);
+    for (int i = 0; i < kVoiceCount; ++i) {
+        g_voices[i] = MusicVoiceState{};
+        g_voices[i].notes = parts[i];
+        g_voices[i].count = counts[i];
+        g_voices[i].loop = loop;
+        g_voices[i].active = (parts[i] != nullptr && counts[i] > 0);
+    }
+    g_drums = DrumVoiceState{};
+    g_drums.notes = drums;
+    g_drums.count = drums_count;
+    g_drums.loop = loop;
+    g_drums.active = (drums != nullptr && drums_count > 0);
     restore_interrupts(save);
 }
 
 void music_stop() {
     const uint32_t save = save_and_disable_interrupts();
-    g_voice_melody.active = false;
-    g_voice_alto.active = false;
-    g_voice_tenor.active = false;
-    g_voice_bass.active = false;
+    for (int i = 0; i < kVoiceCount; ++i) {
+        g_voices[i].active = false;
+    }
+    g_drums.active = false;
     restore_interrupts(save);
 }
 
