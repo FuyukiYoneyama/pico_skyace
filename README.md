@@ -121,8 +121,9 @@ third_party/
 
 - `third_party/ChanFatFS/`: [ChaN 氏の FatFs](http://elm-chan.org/fsw/ff/00index_e.html)。
   BSD 系の独自ライセンス（[LICENSE.txt](third_party/ChanFatFS/LICENSE.txt) 参照）。
-- BGM（`src/game/bgm_track.h`）は、本プロジェクト用に初代エースコンバット風の
-  雰囲気で用意されたオリジナル曲の MIDI からノートデータを機械的に抽出・生成
-  したもの。既存ゲームの楽曲データの複製・採譜ではない。
+- BGM（`src/game/bgm_track.h`）は、ChatGPT（OpenAI）に生成させた、初代
+  エースコンバット風の雰囲気を意図したオリジナル曲の MIDI からノートデータを
+  機械的に抽出・生成したもの。既存ゲームの楽曲データの複製・採譜ではなく、
+  特定の著作物からの抽出でもない。
 - ビルドには [Raspberry Pi Pico SDK](https://github.com/raspberrypi/pico-sdk)
   （BSD-3-Clause）が必要（本リポジトリには含まれない）。
