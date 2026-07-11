@@ -46,6 +46,16 @@ target_include_directories(pico_skyace PRIVATE
 )
 
 target_compile_options(pico_skyace PRIVATE -O3 -Wall -Wextra)
+
+# third_party/ChanFatFS/src/ff.c の gen_numname() で -Wstringop-overflow が
+# 誤検知する（既知のFatFs+GCCパターン）。呼び出し元 dir_register() は
+# 衝突回数 n を for (n = 1; n < 100; n++) で必ず99以下に制限しており、
+# gen_numname() 内のハッシュ計算はこの小さい n を種にする設計のため、
+# 8バイトバッファ ns[8] からはみ出すことは実行時には起こり得ない。
+# ベンダーコードは無改変で保つため、この1ファイルに限定して警告を抑制する。
+set_source_files_properties(third_party/ChanFatFS/src/ff.c PROPERTIES
+    COMPILE_OPTIONS "-Wno-stringop-overflow"
+)
 target_compile_definitions(pico_skyace PRIVATE
     PICO_SKYACE_VERSION_STRING="${PICO_SKYACE_VERSION}"
     PICO_DEFAULT_UART_BAUD_RATE=115200

@@ -3,6 +3,11 @@
 PicoCalc（RP2040 標準構成）向けの、初代エースコンバット風・後方追従視点の
 疑似 3D 空戦ゲーム。
 
+> 本プロジェクトは非公式のファンメイドで、「エースコンバット」シリーズの
+> 権利者（バンダイナムコエンターテインメント）とは無関係。「初代エース
+> コンバット風」は雰囲気・視点構成のオマージュを指す表現で、公式素材は
+> 一切使用していない。
+
 - 内部 160×160 RGB565 レンダリング → PIO SPI で 2 倍拡大し 320×320 へ4象限で転送
 - 固定小数点（位置 Q8 / 三角関数 Q12、角度は brad = 256 で一周）
 - 敵機は 3D 座標を持ち、距離に応じたスプライト拡縮で描画
@@ -119,8 +124,13 @@ third_party/
 
 ### サードパーティ
 
-- `third_party/ChanFatFS/`: [ChaN 氏の FatFs](http://elm-chan.org/fsw/ff/00index_e.html)。
-  BSD 系の独自ライセンス（[LICENSE.txt](third_party/ChanFatFS/LICENSE.txt) 参照）。
+- `third_party/ChanFatFS/`: [ChaN 氏の FatFs](http://elm-chan.org/fsw/ff/00index_e.html)
+  R0.14a を無改変で同梱（`ff.h` 内の `FatFs - Generic FAT Filesystem module R0.14a`
+  表記で確認可能）。BSD 系の独自ライセンス
+  （[LICENSE.txt](third_party/ChanFatFS/LICENSE.txt) 参照）。ビルド時に出ていた
+  `gen_numname()` の `-Wstringop-overflow` 警告は誤検知と確認した上で、
+  ベンダーコードは無改変のまま `CMakeLists.txt` 側でこの1ファイルに限定して
+  抑制している（詳細はそのコメント参照）。
 - BGM（`src/game/bgm_track.h`）は、ChatGPT（OpenAI）に生成させた、初代
   エースコンバット風の雰囲気を意図したオリジナル曲の MIDI からノートデータを
   機械的に抽出・生成したもの。既存ゲームの楽曲データの複製・採譜ではなく、
