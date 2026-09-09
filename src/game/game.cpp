@@ -16,6 +16,16 @@
 #include "platform/picocalc_keyboard.h"
 #include "platform/screenshot_capture.h"
 
+#ifndef PICO_SKYACE_VERSION_STRING
+#define PICO_SKYACE_VERSION_STRING "0.0.0-dev"
+#endif
+
+// エミュレーターの短時間シナリオだけがビルド時に上書きできるようにする。
+// 製品ビルドでは未定義のため、仕様値の30秒を使う。
+#ifndef PICO_SKYACE_TITLE_DEMO_DELAY_MS
+#define PICO_SKYACE_TITLE_DEMO_DELAY_MS 30000u
+#endif
+
 namespace skyace::game {
 namespace {
 
@@ -25,6 +35,18 @@ namespace rules = skyace::game_rules;
 // ---------------------------------------------------------------- 定数
 
 constexpr int kFrameMs = 33;         // 約 30fps
+constexpr uint32_t kGameOverAutoReturnMs = 10000;
+constexpr uint32_t kTitleDemoDelayMs = PICO_SKYACE_TITLE_DEMO_DELAY_MS;
+constexpr uint32_t kDemoDurationMs = 30000;
+constexpr uint32_t kGameOverAutoReturnFrames =
+    (kGameOverAutoReturnMs + static_cast<uint32_t>(kFrameMs) - 1u) /
+    static_cast<uint32_t>(kFrameMs);
+constexpr uint32_t kTitleDemoDelayFrames =
+    (kTitleDemoDelayMs + static_cast<uint32_t>(kFrameMs) - 1u) /
+    static_cast<uint32_t>(kFrameMs);
+constexpr uint32_t kDemoDurationFrames =
+    (kDemoDurationMs + static_cast<uint32_t>(kFrameMs) - 1u) /
+    static_cast<uint32_t>(kFrameMs);
 constexpr int kFocal = 110;          // 内部解像度での焦点距離（px）
 constexpr int kCx = 80;              // 画面中心
 constexpr int kCy = 80;
@@ -69,7 +91,7 @@ struct Input : rules::InputState {
 
 // ---------------------------------------------------------------- 状態
 
-enum class Mode : uint8_t { Title, Play, Pause, GameOver };
+enum class Mode : uint8_t { Title, Play, Pause, GameOver, Demo };
 using DeathReason = rules::DeathReason;
 using RunResult = rules::RunResult;
 
@@ -180,6 +202,7 @@ struct Explosion {
 
 Input g_in;
 Mode g_mode = Mode::Title;
+bool g_demo_mode = false;
 Player g_pl;
 Enemy g_en[kMaxEnemies];
 Missile g_ms[kMaxMissiles];
@@ -187,7 +210,11 @@ Explosion g_ex[kMaxExplosions];
 
 uint32_t g_frame = 0;
 uint32_t g_play_tick = 0;
+uint32_t g_title_timer = 0;
+uint32_t g_demo_timer = 0;
+uint32_t g_gameover_timer = 0;
 uint32_t g_enemy_generation = 0;
+int g_demo_attack_cooldown = 0;
 int g_wave = 0;
 int g_score = 0;
 int g_kills = 0;
@@ -394,6 +421,14 @@ Proj project(int32_t wx, int32_t wy, int32_t wz) {
     return p;
 }
 
+void play_game_sfx(audio::Sfx sfx) {
+    // デモはタイトル曲を主役にするため、同じ戦闘処理を通っても効果音で
+    // 曲を汚さない。実プレイでは従来どおり各SFXを鳴らす。
+    if (!g_demo_mode) {
+        audio::play_sfx(sfx);
+    }
+}
+
 void refresh_enemy_projection() {
     for (auto& e : g_en) {
         if (!e.alive) {
@@ -419,7 +454,7 @@ void refresh_enemy_projection() {
 // ---------------------------------------------------------------- スポーン
 
 void spawn_explosion(int32_t x, int32_t y, int32_t z) {
-    audio::play_sfx(audio::Sfx::Explosion);
+    play_game_sfx(audio::Sfx::Explosion);
     for (auto& e : g_ex) {
         if (!e.active) {
             e.active = true;
@@ -598,6 +633,10 @@ int8_t engine_steering_for_controls() {
 }
 
 void set_engine_for_controls() {
+    if (g_demo_mode) {
+        audio::set_engine(0);
+        return;
+    }
     int throttle = engine_throttle_for_speed(g_pl.speed_q8);
     // O/Lを押している間は速度の追従を待たず、音にも操作意図を先行反映する。
     if (g_in.down['O']) {
@@ -627,8 +666,12 @@ void play_title_music() {
 void update_guidance_target();
 
 void enter_play_from_reset(const char* transition) {
+    g_demo_mode = false;
     reset_game();
     g_mode = Mode::Play;
+    g_title_timer = 0;
+    g_demo_timer = 0;
+    g_gameover_timer = 0;
     audio::music_stop();
     audio::set_engine(0);
     std::printf("MODE %s frame=%lu\r\n", transition,
@@ -651,14 +694,38 @@ void enter_pause() {
 
 void resume_play() {
     g_mode = Mode::Play;
+    g_gameover_timer = 0;
     g_in.block_held();
     set_engine_for_controls();
     std::printf("MODE Pause->Play frame=%lu\r\n",
                 static_cast<unsigned long>(g_frame));
 }
 
+void enter_demo() {
+    g_demo_mode = true;
+    // デモの出撃だけは毎回同じ乱数シードにする。敵の初期配置・AIの分岐は
+    // 実プレイと同じだが、タイトル画面を何度見たかで展開が変わらない。
+    fm::seed_rng(0xd3e0a11u);
+    reset_game();
+    g_mode = Mode::Demo;
+    g_title_timer = 0;
+    g_demo_timer = 0;
+    g_gameover_timer = 0;
+    g_demo_attack_cooldown = 0;
+    // デモ用の自動操縦更新へ切り替える。タイトルから再生中の曲はそのまま
+    // 継続し、攻撃の効果音だけを抑制する。
+    audio::set_engine(0);
+    g_in.block_held();
+    std::printf("MODE Title->Demo frame=%lu\r\n",
+                static_cast<unsigned long>(g_frame));
+}
+
 void enter_title(const char* transition) {
+    g_demo_mode = false;
     g_mode = Mode::Title;
+    g_title_timer = 0;
+    g_demo_timer = 0;
+    g_gameover_timer = 0;
     audio::set_engine(0);
     g_in.block_held();
     std::printf("MODE %s frame=%lu\r\n", transition,
@@ -674,8 +741,26 @@ void finalize_gameover() {
         // HP が外部要因で0になった場合も結果を未確定のままにしない。
         g_death_reason = DeathReason::ShotDown;
     }
+    if (g_demo_mode) {
+        // デモは結果画面を見せるモードではない。死亡した場合も、同じ
+        // reset_game()/start_wave()を使って次の出撃を始め、デモ時間だけを
+        // 継続する。敵AI・衝突・被弾の判定自体は実プレイと同じである。
+        const DeathReason reason = g_death_reason;
+        std::printf("DEMO RESET frame=%lu reason=%d\r\n",
+                    static_cast<unsigned long>(g_frame),
+                    static_cast<int>(reason));
+        reset_game();
+        g_mode = Mode::Demo;
+        g_demo_mode = true;
+        g_demo_attack_cooldown = 0;
+        audio::set_engine(0);
+        g_in.block_held();
+        return;
+    }
+    g_demo_mode = false;
     g_result = {g_score, g_wave, g_kills, g_play_tick, g_death_reason};
     g_mode = Mode::GameOver;
+    g_gameover_timer = kGameOverAutoReturnFrames;
     g_msg_timer = 0;
     g_banner_timer = 0;
     for (auto& e : g_en) {
@@ -727,7 +812,7 @@ bool fire_missile() {
         m.trail_n = 0;
         m.trail_head = 0;
         --g_pl.missiles;
-        audio::play_sfx(audio::Sfx::Missile);
+        play_game_sfx(audio::Sfx::Missile);
         return true;
     }
     set_msg("MSL BUSY");
@@ -893,7 +978,7 @@ void update_player_weapons() {
     if (g_in.down[keys::Space] && g_pl.gun_cd == 0) {
         g_pl.gun_cd = 3;
         g_pl.gun_flash = 3;
-        audio::play_sfx(audio::Sfx::Gun);
+        play_game_sfx(audio::Sfx::Gun);
         for (int i = 0; i < kMaxEnemies; ++i) {
             Enemy& e = g_en[i];
             if (!e.alive || !e.vis) {
@@ -945,7 +1030,7 @@ void update_player_weapons() {
             if (g_pl.lock_timer < 60) {
                 ++g_pl.lock_timer;
                 if (g_pl.lock_timer == 20) {
-                    audio::play_sfx(audio::Sfx::LockOn);
+                    play_game_sfx(audio::Sfx::LockOn);
                 }
             }
         } else {
@@ -1109,7 +1194,7 @@ void update_enemy(int idx) {
                 e.fire_cd = stats.fire_cd;
                 if (static_cast<int>(fm::rnd() % 100) < stats.hit_pct) {
                     apply_player_damage(stats.player_dmg, DeathReason::ShotDown);
-                    audio::play_sfx(audio::Sfx::Hit);
+                    play_game_sfx(audio::Sfx::Hit);
                     set_msg("TAKING FIRE!");
                     if (g_death_reason != DeathReason::None) {
                         return;
@@ -1283,6 +1368,144 @@ void update_play() {
         update_camera_transform();
         refresh_enemy_projection();
     }
+}
+
+int abs_int(int value) {
+    return value < 0 ? -value : value;
+}
+
+void clear_demo_controls() {
+    // Title/Demo中に押されたキーで自動操縦が変わらないようにする。
+    // Enter/Escは状態遷移を先に処理するため、ここでは触れない。
+    const uint8_t controls[] = {
+        keys::Left, keys::Right, keys::Up, keys::Down, keys::Space,
+        static_cast<uint8_t>('M'), static_cast<uint8_t>('O'),
+        static_cast<uint8_t>('L'),
+    };
+    for (const uint8_t key : controls) {
+        g_in.down[key] = false;
+        g_in.pressed[key] = false;
+    }
+}
+
+int demo_target() {
+    if (enemy_reference_alive(g_pl.lock_target, g_pl.lock_generation)) {
+        return g_pl.lock_target;
+    }
+    if (enemy_reference_alive(g_pl.guide_target, g_pl.guide_generation)) {
+        return g_pl.guide_target;
+    }
+
+    int best = -1;
+    uint64_t best_d2 = 0;
+    for (int i = 0; i < kMaxEnemies; ++i) {
+        const Enemy& e = g_en[i];
+        if (!e.alive) {
+            continue;
+        }
+        const int64_t dx = e.x - g_pl.x;
+        const int64_t dy = e.y - g_pl.y;
+        const int64_t dz = e.z - g_pl.z;
+        const uint64_t d2 = static_cast<uint64_t>(
+            dx * dx + dy * dy + dz * dz);
+        if (best < 0 || d2 < best_d2) {
+            best = i;
+            best_d2 = d2;
+        }
+    }
+    if (best >= 0) {
+        g_pl.guide_target = best;
+        g_pl.guide_generation = g_en[best].generation;
+    }
+    return best;
+}
+
+void update_demo_autopilot() {
+    clear_demo_controls();
+    update_camera_transform();
+    refresh_enemy_projection();
+    update_guidance_target();
+
+    const int target_idx = demo_target();
+    if (target_idx < 0) {
+        // ウェーブ切替の瞬間だけ目標がいない場合は、実機プレイと同じく
+        // ゆっくり右へ索敵する。
+        if ((g_demo_timer / 90u) & 1u) {
+            g_in.down[keys::Left] = true;
+        } else {
+            g_in.down[keys::Right] = true;
+        }
+        return;
+    }
+
+    const Enemy& target = g_en[target_idx];
+    const Proj p = project(target.x, target.y, target.z);
+    const int horizontal_m = static_cast<int>(p.xc / kQ8);
+    const int vertical_m = static_cast<int>(p.yc / kQ8);
+
+    // 実プレイと同じロール→ヨー操作で目標を照準へ寄せる。背後の目標も
+    // 同じ投影値から旋回方向を決めるため、固定された見せ物の軌道にはしない。
+    if (target.vis && target.sx > kCx + 8) {
+        g_in.down[keys::Right] = true;
+    } else if (target.vis && target.sx < kCx - 8) {
+        g_in.down[keys::Left] = true;
+    } else if (!target.vis && horizontal_m > 55) {
+        g_in.down[keys::Right] = true;
+    } else if (!target.vis && horizontal_m < -55) {
+        g_in.down[keys::Left] = true;
+    } else if (p.zc <= 0) {
+        // 真後ろは毎回同じ方向へ旋回して、画面内へ戻す。
+        g_in.down[((target_idx + static_cast<int>(g_demo_timer / 90u)) & 1)
+                      ? keys::Left : keys::Right] = true;
+    }
+
+    // 敵との高度差だけを追い、地面へ向かう入力は避ける。実プレイの
+    // pitch制限・移動・地面衝突はそのまま適用される。
+    if (target.vis && target.sy < kReticleY - 8 &&
+        g_pl.y < 1800 * kQ8) {
+        g_in.down[keys::Up] = true;
+    } else if (target.vis && target.sy > kReticleY + 8 &&
+               g_pl.y > 320 * kQ8) {
+        g_in.down[keys::Down] = true;
+    } else if (!target.vis && vertical_m > 80 && g_pl.y < 1800 * kQ8) {
+        g_in.down[keys::Up] = true;
+    } else if (!target.vis && vertical_m < -80 && g_pl.y > 320 * kQ8) {
+        g_in.down[keys::Down] = true;
+    }
+
+    const bool in_gun_cone = target.vis && target.zc > 40 * kQ8 &&
+                             target.zc < 700 * kQ8 &&
+                             abs_int(target.sx - kCx) < 13 &&
+                             abs_int(target.sy - kReticleY) < 13;
+    g_in.down[keys::Space] = in_gun_cone;
+
+    if (g_demo_attack_cooldown > 0) {
+        --g_demo_attack_cooldown;
+    }
+    const bool cadence_attack = g_demo_timer >= 30 &&
+                                ((g_demo_timer - 30u) % 120u) == 0u;
+    if (g_pl.missiles > 0 && g_demo_attack_cooldown == 0 &&
+        (g_pl.lock_timer >= 20 || cadence_attack)) {
+        g_in.pressed['M'] = true;
+        g_demo_attack_cooldown = 90;
+    }
+
+    // 長い追跡では加速し、近距離では自然に90m/sへ戻す。これもOキーを
+    // 実際に押した時と同じ速度・エンジン制御を通る。
+    if (p.zc > 950 * kQ8) {
+        g_in.down['O'] = true;
+    } else if (p.zc > 0 && p.zc < 260 * kQ8 &&
+               (g_demo_timer % 180u) < 24u) {
+        g_in.down['L'] = true;
+    }
+}
+
+void update_demo() {
+    // デモは専用の敵移動・撃墜演出を持たない。自動操縦が実際の入力状態を
+    // 作り、通常プレイと同じ update_play()（敵AI、衝突、武器、Wave、得点）を
+    // そのまま一フレーム進める。描画もrender_play()を共有する。
+    update_demo_autopilot();
+    update_play();
 }
 
 // ---------------------------------------------------------------- 背景描画
@@ -1950,10 +2173,23 @@ void render_title() {
     gfx::text(24, 80, "M      : MISSILE", kColWhite);
     gfx::text(24, 88, "O / L  : THROTTLE", kColWhite);
 
+    char version[24];
+    std::snprintf(version, sizeof(version), "VERSION %s",
+                  PICO_SKYACE_VERSION_STRING);
+    gfx::text(kCx - gfx::text_width(version) / 2, 98, version, kColHudGreen);
+
     if (g_frame & 8) {
         gfx::text(kCx - gfx::text_width("PRESS ENTER", 2) / 2, 140,
                   "PRESS ENTER", kColYellow, 2);
     }
+}
+
+void render_demo() {
+    // 実プレイと同じ背景・敵・自機・照準・レーダー・警告・戦績を描画する。
+    // デモであることは小さなラベルだけで示し、専用の固定演出は置かない。
+    render_play();
+    gfx::text(3, 18, "DEMO", kColYellow);
+    gfx::text(3, 25, "AUTOPILOT", kColOrange);
 }
 
 void render_pause() {
@@ -2036,6 +2272,10 @@ void run() {
                 if (g_in.pressed[keys::Enter]) {
                     enter_play_from_reset("Title->Play");
                     render_play();
+                } else if (++g_title_timer >= kTitleDemoDelayFrames) {
+                    enter_demo();
+                    update_demo();
+                    render_demo();
                 } else {
                     render_title();
                 }
@@ -2064,6 +2304,21 @@ void run() {
                     render_pause();
                 }
                 break;
+            case Mode::Demo:
+                if (g_in.pressed[keys::Enter]) {
+                    enter_play_from_reset("Demo->Play");
+                    render_play();
+                } else if (g_in.pressed[keys::Escape]) {
+                    enter_title("Demo->Title(esc)");
+                    render_title();
+                } else if (++g_demo_timer >= kDemoDurationFrames) {
+                    enter_title("Demo->Title(timeout)");
+                    render_title();
+                } else {
+                    update_demo();
+                    render_demo();
+                }
+                break;
             case Mode::GameOver:
                 update_explosions();
                 if (g_in.pressed[keys::Enter]) {
@@ -2071,6 +2326,10 @@ void run() {
                     render_play();
                 } else if (g_in.pressed[keys::Escape]) {
                     enter_title("GameOver->Title(esc)");
+                    render_title();
+                } else if (g_gameover_timer > 0 &&
+                           --g_gameover_timer == 0) {
+                    enter_title("GameOver->Title(timeout)");
                     render_title();
                 } else {
                     render_gameover();

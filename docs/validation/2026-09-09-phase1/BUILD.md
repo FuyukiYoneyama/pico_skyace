@@ -1,17 +1,21 @@
 # Phase 1 ビルド記録
 
-実施日: 2026-09-09
+> これは v0.9.2 の履歴記録です。デモを実プレイ化し、タイトル曲を再調整した
+> 最新版 v0.9.3 の成果物と検証結果は、[こちらの記録](../2026-09-10-demo/BUILD.md)
+> を参照してください。
 
-対象: `pico_skyace`（作業ツリー、基準コミット `4c599e6` からの未コミット変更を含む）
+実施日: 2026-09-10（Phase 1継続検証）
+
+対象: `pico_skyace` v0.9.2（作業ツリー、基準コミット `4c599e6` からの未コミット変更を含む）
 
 ## 成果物
 
 - [pico_skyace.uf2](../../../build-artifacts/2026-09-09-phase1/pico_skyace.uf2)
-  - SHA-256: `e44924722fbb48beb966ea783c99239a7d609980bf3f2b79928edf149710220b`
+  - SHA-256: `faad5cb21492183d4a93839eedd73befac28aa0c381a052df0d71efe74b9eb19`
 - [pico_skyace.elf](../../../build-artifacts/2026-09-09-phase1/pico_skyace.elf)
-  - SHA-256: `68547ba5a77d1b97e18f189882628f093edc1d375eb9ee2a34798ce8f4b7ea86`
+  - SHA-256: `24ffa20fa030816851e6a573b3aa084f4fb8e51035757aa44f9bc8076b1af8e7`
 - [pico_skyace.bin](../../../build-artifacts/2026-09-09-phase1/pico_skyace.bin)
-  - SHA-256: `468df4c21be0532c344b30768d3d0120bbfcbebf09ac2b8f73d6f730e54563ae`
+  - SHA-256: `fb12168543e32d9d10bf7a4d7811565cc58dd447ede4e82b20619596a3dc544c`
 
 `build-artifacts/` は `.gitignore` 対象のローカル保管場所であり、UF2/ELFはGitへ追加しない。
 
@@ -35,7 +39,7 @@ PICO_SDK_PATH=/home/fuyuki/pico/pico-sdk \
 cmake --build <tmp-pico-build>
 ```
 
-結果: 成功。`text=90300`, `data=0`, `bss=59132`, `dec=149432`。新規警告なし。
+結果: 成功。`text=92916`, `data=0`, `bss=59160`, `dec=152076`。新規警告なし。
 `picotool info`でもUF2のfamily IDが`rp2040`であることを確認した。
 
 エミュレーター診断実行（登録targetではない新規BINの通し確認）:
@@ -46,6 +50,30 @@ cmake --build <tmp-pico-build>
 - [report.json](../../../build-artifacts/2026-09-09-phase1/emulator-boot-play-smoke/report.json)
 - [uart.log](../../../build-artifacts/2026-09-09-phase1/emulator-boot-play-smoke/uart.log)
 - [play.png](../../../build-artifacts/2026-09-09-phase1/emulator-boot-play-smoke/play.png)
+
+今回の画面遷移・自動攻撃・バージョン表示実装（v0.9.2）についても同じ新規BINで
+起動→PlayとPause→Resumeを再実行し、両シナリオとも`verdict.status=pass`、
+`scenario.status=pass`、exceptionなし、unsupported MMIOなし、キーボードdrop 0を
+確認した。UART起動行には`pico_skyace version 0.9.2`が出力される。Title 30秒後の
+Demoと、デモ内での敵機への自動攻撃は長時間シナリオで通し確認した。Demo 30秒後の
+Title、GameOver 10秒後のTitleはコード上のフレームタイマー（33ms周期）で実装済みだが、
+エミュレーターでの長時間経路は未実施。
+
+タイトル表示確認:
+
+- シナリオ: [`title_version_smoke.json`](../../../tests/emulator/title_version_smoke.json)
+- 結果: `pass`（タイトル描画と`pico_skyace version 0.9.2`の起動ログ）
+- [report.json](../../../build-artifacts/2026-09-09-phase1/emulator-title-version-smoke/report.json)
+- [title-version.png](../../../build-artifacts/2026-09-09-phase1/emulator-title-version-smoke/title-version.png)
+
+タイトル→デモ・自動攻撃シナリオ:
+
+- シナリオ: [`title_demo_attack_smoke.json`](../../../tests/emulator/title_demo_attack_smoke.json)
+- 結果: `pass`（Title→Demoを30.44秒で検出し、500ms後の自動攻撃画面を描画）
+- UART: 462 bytes、キーボードdrop: 0、exception: なし、unsupported MMIO: なし
+- [report.json](../../../build-artifacts/2026-09-09-phase1/emulator-title-demo-attack-smoke/report.json)
+- [uart.log](../../../build-artifacts/2026-09-09-phase1/emulator-title-demo-attack-smoke/uart.log)
+- [demo-attack.png](../../../build-artifacts/2026-09-09-phase1/emulator-title-demo-attack-smoke/demo-attack.png)
 
 Pause／再開シナリオ:
 

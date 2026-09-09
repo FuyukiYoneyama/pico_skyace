@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "name": "pico-skyace-title-version-smoke",
+  "description": "Boot the firmware, keep the title screen visible, and capture the version label.",
+  "poll_ms": 5,
+  "steps": [
+    {
+      "op": "wait_until",
+      "label": "firmware initialized",
+      "condition": {"kind": "uart_contains", "text": "pico_skyace version 0.9.3"},
+      "timeout_ms": 3000
+    },
+    {"op": "wait", "ms": 500},
+    {"op": "snapshot", "png": "title-version.png"},
+    {
+      "op": "assert",
+      "label": "title frame is rendered",
+      "condition": {"kind": "region_non_black", "x": 0, "y": 0, "w": 320, "h": 320, "min": 1}
+    }
+  ]
+}
