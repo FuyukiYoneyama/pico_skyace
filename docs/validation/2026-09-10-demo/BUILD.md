@@ -6,10 +6,9 @@
 
 - [pico_skyace.uf2](../../../build-artifacts/2026-09-10-demo/pico_skyace.uf2)
   - SHA-256: `d9ecc5ef699aa2806f0e14a0e693485dffdd88e39d2075bd93a2af41df4b455b`
-- [pico_skyace.elf](../../../build-artifacts/2026-09-10-demo/pico_skyace.elf)
-  - SHA-256: `81961b3050c35a9b37f1dc7bf7ec044b585932cc3c6d30e12384c7f9809095fc`
-- [pico_skyace.bin](../../../build-artifacts/2026-09-10-demo/pico_skyace.bin)
-  - SHA-256: `b4d2e565f1a40e5ea7d4a766dc89dbefcfcfe4241da776a2ff8cdd110d2abb7d`
+
+ELF/BINなどの再生成可能な中間・診断バイナリは整理済み。必要な場合は、READMEの
+製品ビルド手順から同じ成果物を再生成する。検証ログと画面キャプチャは下記に残す。
 
 製品ビルドは`PICO_SKYACE_TITLE_DEMO_DELAY_MS`を指定せず、タイトルからデモへ
 30秒で遷移する既定値を使用した。`arm-none-eabi-size`は`text=93204`、

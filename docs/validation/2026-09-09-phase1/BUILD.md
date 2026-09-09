@@ -10,14 +10,8 @@
 
 ## 成果物
 
-- [pico_skyace.uf2](../../../build-artifacts/2026-09-09-phase1/pico_skyace.uf2)
-  - SHA-256: `faad5cb21492183d4a93839eedd73befac28aa0c381a052df0d71efe74b9eb19`
-- [pico_skyace.elf](../../../build-artifacts/2026-09-09-phase1/pico_skyace.elf)
-  - SHA-256: `24ffa20fa030816851e6a573b3aa084f4fb8e51035757aa44f9bc8076b1af8e7`
-- [pico_skyace.bin](../../../build-artifacts/2026-09-09-phase1/pico_skyace.bin)
-  - SHA-256: `fb12168543e32d9d10bf7a4d7811565cc58dd447ede4e82b20619596a3dc544c`
-
-`build-artifacts/` は `.gitignore` 対象のローカル保管場所であり、UF2/ELFはGitへ追加しない。
+旧版のUF2/ELF/BINは再生成可能な履歴用バイナリとして整理済み。検証ログと画面
+キャプチャは残してあり、必要なバイナリは現行版のビルド手順から再生成する。
 
 ## 実行した検証
 
