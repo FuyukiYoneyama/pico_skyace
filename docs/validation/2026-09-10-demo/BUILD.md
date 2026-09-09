@@ -4,11 +4,11 @@
 
 ## 成果物
 
-- [pico_skyace.uf2](../../../build-artifacts/2026-09-10-demo/pico_skyace.uf2)
-  - SHA-256: `d9ecc5ef699aa2806f0e14a0e693485dffdd88e39d2075bd93a2af41df4b455b`
+- [pico_skyace.uf2](../../../build/pico_skyace.uf2)
+  - SHA-256: `741264e98b129f040a222d3ea991d032f3a5f14eb0d86d006f095d2129d84604`
 
-ELF/BINなどの再生成可能な中間・診断バイナリは整理済み。必要な場合は、READMEの
-製品ビルド手順から同じ成果物を再生成する。検証ログと画面キャプチャは下記に残す。
+最新の製品ビルドは標準の`build/`に置く。`build-artifacts/`には検証ログと画面
+キャプチャだけを残し、再生成可能な中間・診断バイナリは保管しない。
 
 製品ビルドは`PICO_SKYACE_TITLE_DEMO_DELAY_MS`を指定せず、タイトルからデモへ
 30秒で遷移する既定値を使用した。`arm-none-eabi-size`は`text=93204`、
