@@ -18,6 +18,8 @@
 //   kDrumNotes  : Drums トラック（GM ノートをキック/スネア/ハット/
 //                 クラッシュ/タムの5種の合成ドラムへ写像。同時打点は
 //                 優先度 クラッシュ>キック>スネア>タム>ハット で1つに）
+//   kTitleDrumNotes: タイトル／ゲームオーバー用の短いキック・スネア・
+//                    ハット・タム・クラッシュのメニュー・グルーヴ
 // Strings Pad トラックはチャンネル数の都合で未使用。
 // 全チャンネルの合計時間は末尾休符で完全一致させてあり、ループ再生でも
 // チャンネル間がずれない。freq_hz=0 / type=0 は休符。
@@ -659,6 +661,19 @@ inline const MusicNote kBassNotes[] = {
     {0, 332},
 };
 constexpr int kBassNotesCount = sizeof(kBassNotes) / sizeof(kBassNotes[0]);
+
+// タイトル／ゲームオーバー用の締まったメニュー・グルーヴ。
+// 200msの基本打点に、末尾だけ100msのキック／タム・フィルを入れる。
+// 3.2秒ループでアルペジオの刻みとも揃う。
+inline constexpr DrumNote kTitleDrumNotes[] = {
+    {4, 200}, {3, 200}, {2, 200}, {3, 200},
+    {1, 200}, {3, 200}, {2, 200}, {3, 200},
+    {1, 200}, {3, 200}, {2, 200}, {3, 200},
+    {1, 100}, {3, 100}, {1, 100}, {3, 100},
+    {5, 100}, {5, 100}, {5, 100}, {4, 100},
+};
+constexpr int kTitleDrumNotesCount =
+    sizeof(kTitleDrumNotes) / sizeof(kTitleDrumNotes[0]);
 
 inline const DrumNote kDrumNotes[] = {
     {4, 200}, {3, 200}, {2, 200}, {3, 200},

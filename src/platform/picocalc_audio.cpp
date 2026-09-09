@@ -31,8 +31,10 @@ inline int32_t next_noise() {
 }
 
 // --- エンジン（連続音）: スロットルに応じてピッチと音量が変わる矩形波に
-// ノイズを薄く混ぜて排気音っぽくする ---
+// ノイズを薄く混ぜ、旋回・ピッチ操作中は負荷に応じて唸りを強める ---
 volatile uint8_t g_throttle = 0;
+volatile uint8_t g_engine_maneuver = 0;
+volatile int8_t g_engine_steering = 0;
 uint32_t g_engine_phase = 0;
 
 // --- BGM: 4音程チャンネル（リード/アルペジオ/コード/ベース）+ ドラム。
@@ -157,11 +159,11 @@ struct DrumTimbre {
 // index = DrumType（0=rest は未使用）
 constexpr DrumTimbre kDrumTimbres[6] = {
     {0, 0},      // rest
-    {70, 56},    // kick
-    {110, 46},   // snare
-    {28, 22},    // closed hat
-    {240, 26},   // crash / open hat
-    {90, 42},    // tom
+    {72, 62},    // kick
+    {105, 52},   // snare
+    {24, 28},    // closed hat
+    {180, 34},   // crash / open hat
+    {84, 48},    // tom
 };
 
 struct DrumVoiceState {
@@ -243,8 +245,15 @@ int32_t drum_render() {
             sample = (tone * 70 + noise * 185) / 255;
             break;
         }
-        case kDrumHat:
-        case kDrumCrash: {  // ノイズのみ（長さの違いでハット/クラッシュを表現）
+        case kDrumHat: {  // ノイズに金属的な短いクリックを重ねる
+            g_drums.phase += (2800u << 16) / kSampleRateHz;
+            const int32_t metal =
+                ((g_drums.phase & 0xffffu) < 0x4000u) ? amp : -amp;
+            const int32_t noise = (next_noise() * amp) / 128;
+            sample = (metal * 42 + noise * 213) / 255;
+            break;
+        }
+        case kDrumCrash: {  // クラッシュ/オープンハットはノイズを長めに残す
             sample = (next_noise() * amp) / 128;
             break;
         }
@@ -276,16 +285,25 @@ volatile SfxState g_sfx = {};
 
 bool timer_callback(repeating_timer_t*) {
     int32_t mix = 0;
+    int32_t engine_mix = 0;
 
     const uint8_t throttle = g_throttle;
+    const uint8_t maneuver = g_engine_maneuver;
     if (throttle > 0) {
-        const uint32_t freq = 50u + (static_cast<uint32_t>(throttle) * 140u) / 255u;
+        // 操作負荷を少しだけピッチへ加え、旋回中のエンジンの張りを出す。
+        const uint32_t freq =
+            50u + (static_cast<uint32_t>(throttle) * 140u) / 255u +
+            (static_cast<uint32_t>(maneuver) * 28u) / 255u;
         const uint32_t step = (freq << 16) / kSampleRateHz;
         g_engine_phase += step;
         const bool high = (g_engine_phase & 0xffffu) < 0x8000u;
-        const int32_t tone = high ? 40 : -40;
-        const int32_t rumble = (next_noise() * 18) / 128;
-        mix += (tone + rumble) * (20 + throttle / 3) / 64;
+        const int32_t tone_amp = 32 + throttle / 32 + maneuver / 32;
+        const int32_t tone = high ? tone_amp : -tone_amp;
+        const int32_t rumble_amp = 10 + throttle / 20 + maneuver / 12;
+        const int32_t rumble = (next_noise() * rumble_amp) / 128;
+        const int32_t gain = 18 + throttle / 4 + maneuver / 16;
+        engine_mix = (tone + rumble) * gain / 96;
+        mix += engine_mix;
     }
 
     if (g_sfx.active) {
@@ -320,16 +338,30 @@ bool timer_callback(repeating_timer_t*) {
     mix += music_voice_render(kVoiceBass);
     mix += drum_render();
 
-    if (mix > 127) {
-        mix = 127;
+    // 旋回方向をエンジン成分だけに薄く反映し、BGM/SFXは中央に保つ。
+    const int32_t steering = g_engine_steering;
+    const int32_t pan = (steering * 56) / 127;
+    const int32_t base_mix = mix - engine_mix;
+    int32_t left_mix = base_mix + engine_mix * (256 - pan) / 256;
+    int32_t right_mix = base_mix + engine_mix * (256 + pan) / 256;
+    if (left_mix > 127) {
+        left_mix = 127;
     }
-    if (mix < -128) {
-        mix = -128;
+    if (left_mix < -128) {
+        left_mix = -128;
     }
-    const uint16_t level =
-        static_cast<uint16_t>(((mix + 128) * kPwmWrap) / 255);
-    pwm_set_chan_level(g_slice, g_chan_l, level);
-    pwm_set_chan_level(g_slice, g_chan_r, level);
+    if (right_mix > 127) {
+        right_mix = 127;
+    }
+    if (right_mix < -128) {
+        right_mix = -128;
+    }
+    const uint16_t left_level =
+        static_cast<uint16_t>(((left_mix + 128) * kPwmWrap) / 255);
+    const uint16_t right_level =
+        static_cast<uint16_t>(((right_mix + 128) * kPwmWrap) / 255);
+    pwm_set_chan_level(g_slice, g_chan_l, left_level);
+    pwm_set_chan_level(g_slice, g_chan_r, right_level);
     return true;
 }
 
@@ -371,8 +403,12 @@ void init() {
                            timer_callback, nullptr, &g_timer);
 }
 
-void set_engine(uint8_t throttle) {
+void set_engine(uint8_t throttle, uint8_t maneuver, int8_t steering) {
+    const uint32_t save = save_and_disable_interrupts();
     g_throttle = throttle;
+    g_engine_maneuver = maneuver;
+    g_engine_steering = steering;
+    restore_interrupts(save);
 }
 
 void music_play(const MusicNote* lead, int lead_count,

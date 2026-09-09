@@ -52,9 +52,11 @@ void music_play(const MusicNote* lead, int lead_count,
                 const DrumNote* drums, int drums_count, bool loop);
 void music_stop();
 
-// エンジン音（連続）。throttle=0 で停止、255 で最大。速度に応じて毎フレーム
-// 呼ぶ。ピッチと音量の両方が throttle に追従する。
-void set_engine(uint8_t throttle);
+// エンジン音（連続）。throttle=0 で停止、255 で最大。毎フレーム呼ぶ。
+// maneuver は旋回・ピッチ操作による負荷 (0..255)、steering は左右旋回の
+// 方向 (-127=左、127=右) で、ピッチ・ノイズ・左右定位をわずかに変化させる。
+void set_engine(uint8_t throttle, uint8_t maneuver = 0,
+                int8_t steering = 0);
 
 enum class Sfx : uint8_t {
     Gun,        // 機銃: 短いノイズ主体のクリック

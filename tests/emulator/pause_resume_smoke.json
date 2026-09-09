@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "name": "pico-skyace-pause-resume-smoke",
+  "description": "Enter Play, pause without advancing the upper playfield, then resume.",
+  "poll_ms": 5,
+  "steps": [
+    {
+      "op": "wait_until",
+      "label": "firmware initialized",
+      "condition": {"kind": "uart_contains", "text": "BACKLIGHT set level=220 ok=1"},
+      "timeout_ms": 3000
+    },
+    {
+      "op": "key_events",
+      "label": "start Play",
+      "gap_ms": 50,
+      "events": [
+        {"state": "pressed", "code": 10},
+        {"state": "released", "code": 10}
+      ]
+    },
+    {"op": "wait", "ms": 500},
+    {
+      "op": "key_events",
+      "label": "pause",
+      "gap_ms": 50,
+      "events": [
+        {"state": "pressed", "code": 80},
+        {"state": "released", "code": 80}
+      ]
+    },
+    {
+      "op": "wait_until",
+      "label": "pause transition logged",
+      "condition": {"kind": "uart_contains", "text": "MODE Play->Pause"},
+      "timeout_ms": 1000
+    },
+    {
+      "op": "wait_until",
+      "label": "upper playfield stays stable",
+      "condition": {"kind": "region_stable", "x": 0, "y": 0, "w": 320, "h": 230, "for_ms": 300},
+      "timeout_ms": 1000
+    },
+    {
+      "op": "key_events",
+      "label": "resume",
+      "gap_ms": 50,
+      "events": [
+        {"state": "pressed", "code": 80},
+        {"state": "released", "code": 80}
+      ]
+    },
+    {
+      "op": "wait_until",
+      "label": "resume transition logged",
+      "condition": {"kind": "uart_contains", "text": "MODE Pause->Play"},
+      "timeout_ms": 1000
+    },
+    {"op": "wait", "ms": 100},
+    {
+      "op": "assert",
+      "label": "resumed frame remains rendered",
+      "condition": {"kind": "region_non_black", "x": 0, "y": 0, "w": 320, "h": 320, "min": 1}
+    }
+  ]
+}

@@ -32,6 +32,7 @@ add_executable(pico_skyace
     src/platform/sd/picocalc_sdcard.cpp
     src/platform/sd/fatfs_diskio.cpp
     src/game/fixed_math.cpp
+    src/game/game_rules.cpp
     src/game/gfx.cpp
     src/game/game.cpp
     third_party/ChanFatFS/src/ff.c

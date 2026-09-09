@@ -19,7 +19,9 @@ PicoCalc（RP2040 標準構成）向けの、初代エースコンバット風�
 - 8kHz IRQ ミキシングによるノイズ入り効果音・エンジン音・5チャンネルの
   チップチューン風BGM（リード/アルペジオ/ブラス/ベース + 合成ドラム。
   チャンネルごとにデューティ比・エンベロープを変え、リードにはビブラート、
-  ドラムはキック/スネア/ハット/クラッシュ/タムをノイズと矩形波で合成）
+  ドラムはキック/スネア/ハット/クラッシュ/タムをノイズと矩形波で合成。
+  タイトル曲は短いフィル付きのメニュー・グルーヴ、エンジン音はスロットル
+  と旋回／ピッチ操作の負荷に追従）
 - F5 キーで SD カードに BMP スクリーンショットを保存
 - 約 30fps（sysclk 250 MHz、LCD 62.5 MHz SPI 相当）
 
@@ -41,11 +43,14 @@ PicoCalc（RP2040 標準構成）向けの、初代エースコンバット風�
 | M | ミサイル発射（ロックオン中は誘導） |
 | O / L | 加速 / 減速 |
 | F5 | スクリーンショットを SD カードの `/screenshots/` に保存 |
-| Enter | タイトル / ゲームオーバーから開始 |
-| Esc | プレイ中にタイトルへ戻る |
+| Enter | タイトルから開始 / ゲームオーバーから再出撃 / ポーズ解除 |
+| P | プレイ中にポーズ / ポーズ解除 |
+| Esc | プレイ中にポーズ / ポーズ中・ゲームオーバーからタイトルへ |
 
 照準（画面中央の円）に敵を約 0.7 秒とらえ続けると LOCK（赤枠）になり、
-その状態で撃ったミサイルが誘導される。高度 0 に落ちると墜落。
+その状態で撃ったミサイルが誘導される。画面外の敵は黄色い矢印で方向を案内し、
+敵の射線に入ると赤い INCOMING 警告が出る。高度 0 に落ちると墜落し、
+ゲームオーバーではスコア・Wave・撃墜数・飛行時間・敗因を表示する。
 
 ## 必要なハードウェア
 
@@ -65,6 +70,38 @@ cmake -S . -B build -G Ninja
 cmake --build build
 # 成果物: build/pico_skyace.uf2
 ```
+
+ハードウェアに依存しないロジックテストは、別のホスト用CMakeプロジェクトで実行できます。
+
+```sh
+cmake -S tests -B build-host-tests -G Ninja
+cmake --build build-host-tests
+ctest --test-dir build-host-tests --output-on-failure
+```
+
+### エミュレーター検証
+
+`picocalc_emu` と `picoem-picocalc` が同じworkspaceにある場合、Pico用ELFからraw BINを作り、
+PicoCalcのLCD・キーボード・音声モデル上で実行できます。runnerはUF2を直接読まないため、
+まず次の変換を行います。
+
+```sh
+arm-none-eabi-objcopy -O binary build/pico_skyace.elf build/pico_skyace.bin
+runner=/home/fuyuki/pico_dvl/codex/picoem-picocalc/target/release/picocalc-run
+bootrom=/home/fuyuki/pico_dvl/codex/picoem-picocalc/roms/rp2040/bootrom-rp2040-b2.bin
+out=/tmp/pico-skyace-emu-run
+mkdir -p "$out/snapshots"
+"$runner" --bin build/pico_skyace.bin --bootrom "$bootrom" \
+  --board picocalc --lcd-variant pio-rgb565 --keyboard \
+  --scenario tests/emulator/boot_play_smoke.json \
+  --snapshot-dir "$out/snapshots" --uart "$out/uart.log" \
+  --json "$out/report.json"
+```
+
+`report.json` の `verdict.status` と `scenario.status` が `pass` であること、
+`exception`・`unsupported_mmio`・キーボードdropがないことを確認します。これは登録targetの
+正式回帰判定ではなく、新規BINの診断実行です。実行シナリオと保存済み結果は
+[`Phase 1ビルド記録`](docs/validation/2026-09-09-phase1/BUILD.md)を参照してください。
 
 BOOTSEL を押しながら USB 接続し、`pico_skyace.uf2` をドラッグ&ドロップで書き込む。
 
@@ -105,6 +142,7 @@ src/
 │   └── sd/                     # SD カード SPI ドライバ・FatFs ブリッジ
 ├── game/
 │   ├── fixed_math.*             # sin/cos/tan/atan2/isqrt/乱数（固定小数点）
+│   ├── game_rules.*             # 敗因確定・標的世代判定（ホストテスト可能）
 │   ├── gfx.*                    # 160x160 フレームバッファ描画プリミティブ
 │   ├── font5x7.h                # 5x7 ビットマップフォント
 │   ├── bgm_track.h              # BGM 用ノートデータ（MIDIから生成）
@@ -114,6 +152,8 @@ third_party/
 ```
 
 ## バージョン
+
+今後の改善方針・優先順位・検証条件は [アップデート計画](docs/UPDATE_PLAN.md) を参照。
 
 `VERSION` ファイルで管理（major.minor.patch）。ソース挙動が変わるビルドを
 渡すときは必ず数値を上げること。

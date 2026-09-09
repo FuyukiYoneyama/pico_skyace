@@ -26,7 +26,13 @@ inline int32_t mul_q12(int32_t a, int32_t b) {
 uint32_t isqrt64(uint64_t v);
 
 // xorshift 乱数
+// ゲーム開始時に再現用のシードを設定する。seed=0 は既定の非ゼロ値へ置換する。
+void seed_rng(uint32_t seed);
 uint32_t rnd();
+
+// 描画やUI専用の乱数。ゲーム進行の乱数状態を消費しない。
+void seed_fx_rng(uint32_t seed);
+uint32_t rnd_fx();
 inline int32_t rnd_range(int32_t lo, int32_t hi) {
     return lo + static_cast<int32_t>(rnd() % static_cast<uint32_t>(hi - lo + 1));
 }

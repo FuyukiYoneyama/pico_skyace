@@ -7,6 +7,7 @@ namespace {
 
 int32_t g_sin_table[256];
 uint32_t g_rng_state = 0x12345678u;
+uint32_t g_fx_rng_state = 0x9e3779b9u;
 
 }  // namespace
 
@@ -64,6 +65,23 @@ uint32_t rnd() {
     s ^= s >> 17;
     s ^= s << 5;
     g_rng_state = s;
+    return s;
+}
+
+void seed_rng(uint32_t seed) {
+    g_rng_state = seed != 0 ? seed : 0x12345678u;
+}
+
+void seed_fx_rng(uint32_t seed) {
+    g_fx_rng_state = seed != 0 ? seed : 0x9e3779b9u;
+}
+
+uint32_t rnd_fx() {
+    uint32_t s = g_fx_rng_state;
+    s ^= s << 13;
+    s ^= s >> 17;
+    s ^= s << 5;
+    g_fx_rng_state = s;
     return s;
 }
 

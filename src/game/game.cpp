@@ -6,6 +6,7 @@
 
 #include "game/fixed_math.h"
 #include "game/bgm_track.h"
+#include "game/game_rules.h"
 #include "game/gfx.h"
 #include "hardware/watchdog.h"
 #include "pico/stdlib.h"
@@ -19,6 +20,7 @@ namespace skyace::game {
 namespace {
 
 namespace fm = skyace::fixmath;
+namespace rules = skyace::game_rules;
 
 // ---------------------------------------------------------------- 定数
 
@@ -31,6 +33,8 @@ constexpr int kReticleY = 72;        // 照準の画面 y
 constexpr int kMaxEnemies = 5;
 constexpr int kMaxMissiles = 4;
 constexpr int kMaxExplosions = 6;
+constexpr int kAttackWarningFrames = 18;  // 約0.6秒の予告
+constexpr int kAttackAltitudeToleranceM = 120;
 
 constexpr int32_t kQ8 = 256;
 
@@ -53,39 +57,21 @@ constexpr uint16_t kColGndFar = gfx::rgb(96, 138, 122);
 
 // ---------------------------------------------------------------- 入力
 
-struct Input {
-    bool down[256] = {};
-    bool pressed[256] = {};
-
-    void begin_frame() {
-        std::memset(pressed, 0, sizeof(pressed));
-    }
-
+struct Input : rules::InputState {
     void poll() {
         keyboard::KeyEvent ev;
         while (keyboard::read_event(&ev)) {
             const uint8_t key = keys::uppercase_ascii(ev.key);
-            switch (ev.state) {
-                case keyboard::KeyState::Pressed:
-                    down[key] = true;
-                    pressed[key] = true;
-                    break;
-                case keyboard::KeyState::Hold:
-                    down[key] = true;
-                    break;
-                case keyboard::KeyState::Released:
-                    down[key] = false;
-                    break;
-                default:
-                    break;
-            }
+            apply_event(key, static_cast<rules::InputEventState>(ev.state));
         }
     }
 };
 
 // ---------------------------------------------------------------- 状態
 
-enum class Mode : uint8_t { Title, Play, GameOver };
+enum class Mode : uint8_t { Title, Play, Pause, GameOver };
+using DeathReason = rules::DeathReason;
+using RunResult = rules::RunResult;
 
 struct Player {
     int32_t x, y, z;      // Q8 メートル（y = 高度）
@@ -97,8 +83,12 @@ struct Player {
     int missiles;
     int gun_cd;
     int gun_flash;
+    int hit_flash;
     int lock_target;      // -1 = 無し
+    uint32_t lock_generation;
     int lock_timer;
+    int guide_target;     // -1 = 無し（ロックとは独立した案内対象）
+    uint32_t guide_generation;
     int dmg_flash;
 };
 
@@ -107,6 +97,7 @@ enum class EnemyType : uint8_t { Fighter, Bomber, Interceptor };
 
 struct Enemy {
     bool alive;
+    uint32_t generation;
     int32_t x, y, z;
     uint16_t yaw_q8;
     int32_t speed_q8;
@@ -116,6 +107,7 @@ struct Enemy {
     int8_t turn_dir;
     int16_t timer;
     int16_t fire_cd;
+    int16_t warning_timer;
     // 直近フレームの投影キャッシュ（HUD・照準判定用）
     bool vis;
     int sx, sy;
@@ -173,6 +165,7 @@ struct Missile {
     int32_t x, y, z;
     int32_t vx, vy, vz;   // Q8 m/s
     int target;
+    uint32_t target_generation;
     int16_t life;
     int trail_n;
     int trail_head;
@@ -193,12 +186,17 @@ Missile g_ms[kMaxMissiles];
 Explosion g_ex[kMaxExplosions];
 
 uint32_t g_frame = 0;
+uint32_t g_play_tick = 0;
+uint32_t g_enemy_generation = 0;
 int g_wave = 0;
 int g_score = 0;
+int g_kills = 0;
 int g_banner_timer = 0;
 int g_msg_timer = 0;
 char g_msg[24] = "";
 bool g_crashed = false;
+DeathReason g_death_reason = DeathReason::None;
+RunResult g_result{};
 
 // 描画用（フレーム毎に計算）
 int g_hy = 80;            // 地平線の中心 y
@@ -326,6 +324,7 @@ struct Proj {
     bool ok;
     int sx, sy;      // ロール適用済みスクリーン座標
     int32_t zc;      // カメラ空間の奥行き（Q8 m）
+    int32_t xc, yc;  // カメラ空間の左右・上下（Q8 m）
 };
 
 void apply_roll(int sx0, int sy0, int* sx, int* sy) {
@@ -333,6 +332,29 @@ void apply_roll(int sx0, int sy0, int* sx, int* sy) {
     const int32_t dy = sy0 - g_hy;
     *sx = kCx + static_cast<int>((dx * g_cosr - dy * g_sinr) >> 12);
     *sy = g_hy + static_cast<int>((dx * g_sinr + dy * g_cosr) >> 12);
+}
+
+void update_camera_transform() {
+    const int8_t pitch = static_cast<int8_t>(g_pl.pitch_q8 >> 8);
+    const int32_t tan_p = fm::tan_q12(pitch);
+    g_hy = kCy + static_cast<int>((static_cast<int64_t>(kFocal) * tan_p) >> 12);
+    if (g_hy < -400) {
+        g_hy = -400;
+    }
+    if (g_hy > 560) {
+        g_hy = 560;
+    }
+
+    const int32_t roll = -g_pl.roll;
+    g_cosr = fm::cos_q12(static_cast<uint8_t>(roll & 0xff));
+    g_sinr = fm::sin_q12(static_cast<uint8_t>(roll & 0xff));
+    g_slope_q8 = fm::tan_q12(roll) >> 4;
+    if (g_slope_q8 > 900) {
+        g_slope_q8 = 900;
+    }
+    if (g_slope_q8 < -900) {
+        g_slope_q8 = -900;
+    }
 }
 
 Proj project(int32_t wx, int32_t wy, int32_t wz) {
@@ -355,6 +377,10 @@ Proj project(int32_t wx, int32_t wy, int32_t wz) {
     const int32_t yc = static_cast<int32_t>(
         (dy * cp - static_cast<int64_t>(z1) * sp) >> 12);
 
+    p.zc = zc;
+    p.xc = xc;
+    p.yc = yc;
+
     if (zc < 3 * kQ8) {
         p.ok = false;
         return p;
@@ -364,9 +390,30 @@ Proj project(int32_t wx, int32_t wy, int32_t wz) {
     const int sy0 = kCy - static_cast<int>(
         (static_cast<int64_t>(yc) * kFocal) / zc);
     apply_roll(sx0, sy0, &p.sx, &p.sy);
-    p.zc = zc;
     p.ok = (p.sx > -80 && p.sx < 240 && p.sy > -80 && p.sy < 240);
     return p;
+}
+
+void refresh_enemy_projection() {
+    for (auto& e : g_en) {
+        if (!e.alive) {
+            e.vis = false;
+            e.pixw = 0;
+            continue;
+        }
+        const Proj p = project(e.x, e.y, e.z);
+        e.vis = p.ok;
+        if (!p.ok) {
+            e.pixw = 0;
+            continue;
+        }
+        e.sx = p.sx;
+        e.sy = p.sy;
+        e.zc = p.zc;
+        const int32_t wingspan_m = enemy_stats(e.type).wingspan_m;
+        e.pixw = static_cast<int>(
+            (static_cast<int64_t>(wingspan_m * kFocal) * kQ8) / p.zc);
+    }
 }
 
 // ---------------------------------------------------------------- スポーン
@@ -393,6 +440,11 @@ void spawn_enemy() {
         const uint8_t bearing = static_cast<uint8_t>(fm::rnd() & 0xff);
         const int32_t dist = fm::rnd_range(900, 1400) * kQ8;
         e.alive = true;
+        ++g_enemy_generation;
+        if (g_enemy_generation == 0) {
+            ++g_enemy_generation;
+        }
+        e.generation = g_enemy_generation;
         e.x = g_pl.x + static_cast<int32_t>(
             (static_cast<int64_t>(dist) * fm::sin_q12(bearing)) >> 12);
         e.z = g_pl.z + static_cast<int32_t>(
@@ -414,6 +466,7 @@ void spawn_enemy() {
         e.turn_dir = (fm::rnd() & 1) ? 1 : -1;
         e.timer = static_cast<int16_t>(fm::rnd_range(40, 120));
         e.fire_cd = 30;
+        e.warning_timer = 0;
         e.vis = false;
         std::printf("SPAWN wave=%d type=%d\r\n", g_wave, static_cast<int>(e.type));
         return;
@@ -450,6 +503,7 @@ void reset_game() {
     std::memset(g_en, 0, sizeof(g_en));
     std::memset(g_ms, 0, sizeof(g_ms));
     std::memset(g_ex, 0, sizeof(g_ex));
+    g_enemy_generation = 0;
     g_pl = Player{};
     g_pl.x = 0;
     g_pl.y = 800 * kQ8;
@@ -459,9 +513,16 @@ void reset_game() {
     g_pl.hp = 100;
     g_pl.missiles = 8;
     g_pl.lock_target = -1;
+    g_pl.lock_generation = 0;
+    g_pl.guide_target = -1;
+    g_pl.guide_generation = 0;
+    g_play_tick = 0;
     g_score = 0;
+    g_kills = 0;
     g_crashed = false;
     g_msg_timer = 0;
+    g_death_reason = DeathReason::None;
+    g_result = {};
     start_wave(1);
 }
 
@@ -470,11 +531,170 @@ void set_msg(const char* s) {
     g_msg_timer = 50;
 }
 
+void apply_player_damage(int amount, DeathReason reason) {
+    if (amount <= 0 || g_death_reason != DeathReason::None) {
+        return;
+    }
+    const rules::DamageResult result = rules::apply_damage(
+        g_pl.hp, g_death_reason, amount, reason);
+    g_pl.hp = result.hp;
+    g_death_reason = result.death_reason;
+    g_pl.dmg_flash = 8;
+}
+
+uint8_t engine_throttle_for_speed(int32_t speed_q8) {
+    int32_t throttle = ((speed_q8 - 45 * kQ8) * 255) / (105 * kQ8);
+    if (throttle < 0) {
+        throttle = 0;
+    }
+    if (throttle > 255) {
+        throttle = 255;
+    }
+    return static_cast<uint8_t>(throttle);
+}
+
+uint8_t engine_maneuver_for_controls() {
+    int maneuver = 0;
+    const bool rolling = g_in.down[keys::Left] || g_in.down[keys::Right];
+    const bool pitching = g_in.down[keys::Up] || g_in.down[keys::Down];
+    if (rolling) {
+        maneuver = 170;
+    }
+    if (pitching && maneuver < 130) {
+        maneuver = 130;
+    }
+
+    const int roll_load = (g_pl.roll < 0 ? -g_pl.roll : g_pl.roll) * 220 / 44;
+    const int pitch_brad = g_pl.pitch_q8 >> 8;
+    const int pitch_load =
+        (pitch_brad < 0 ? -pitch_brad : pitch_brad) * 200 / 24;
+    if (maneuver < roll_load) {
+        maneuver = roll_load;
+    }
+    if (maneuver < pitch_load) {
+        maneuver = pitch_load;
+    }
+    if (maneuver > 255) {
+        maneuver = 255;
+    }
+    return static_cast<uint8_t>(maneuver);
+}
+
+int8_t engine_steering_for_controls() {
+    if (g_in.down[keys::Left]) {
+        return -127;
+    }
+    if (g_in.down[keys::Right]) {
+        return 127;
+    }
+    int steering = g_pl.roll * 127 / 44;
+    if (steering < -127) {
+        steering = -127;
+    }
+    if (steering > 127) {
+        steering = 127;
+    }
+    return static_cast<int8_t>(steering);
+}
+
+void set_engine_for_controls() {
+    int throttle = engine_throttle_for_speed(g_pl.speed_q8);
+    // O/Lを押している間は速度の追従を待たず、音にも操作意図を先行反映する。
+    if (g_in.down['O']) {
+        throttle += 24;
+    } else if (g_in.down['L']) {
+        throttle -= 20;
+    }
+    if (throttle < 0) {
+        throttle = 0;
+    }
+    if (throttle > 255) {
+        throttle = 255;
+    }
+    audio::set_engine(static_cast<uint8_t>(throttle),
+                      engine_maneuver_for_controls(),
+                      engine_steering_for_controls());
+}
+
+void play_title_music() {
+    audio::music_play(bgm::kLeadNotes, bgm::kLeadNotesCount,
+                      bgm::kArpNotes, bgm::kArpNotesCount,
+                      bgm::kChordNotes, bgm::kChordNotesCount,
+                      bgm::kBassNotes, bgm::kBassNotesCount,
+                      bgm::kTitleDrumNotes, bgm::kTitleDrumNotesCount, true);
+}
+
+void update_guidance_target();
+
+void enter_play_from_reset(const char* transition) {
+    reset_game();
+    g_mode = Mode::Play;
+    audio::music_stop();
+    audio::set_engine(0);
+    std::printf("MODE %s frame=%lu\r\n", transition,
+                static_cast<unsigned long>(g_frame));
+    // 初期速度90m/sに対応したエンジン音を、最初の更新前から開始する。
+    set_engine_for_controls();
+    g_in.block_held();
+    update_camera_transform();
+    refresh_enemy_projection();
+    update_guidance_target();
+}
+
+void enter_pause() {
+    g_mode = Mode::Pause;
+    audio::set_engine(0);
+    g_in.block_held();
+    std::printf("MODE Play->Pause frame=%lu\r\n",
+                static_cast<unsigned long>(g_frame));
+}
+
+void resume_play() {
+    g_mode = Mode::Play;
+    g_in.block_held();
+    set_engine_for_controls();
+    std::printf("MODE Pause->Play frame=%lu\r\n",
+                static_cast<unsigned long>(g_frame));
+}
+
+void enter_title(const char* transition) {
+    g_mode = Mode::Title;
+    audio::set_engine(0);
+    g_in.block_held();
+    std::printf("MODE %s frame=%lu\r\n", transition,
+                static_cast<unsigned long>(g_frame));
+    play_title_music();
+}
+
+void finalize_gameover() {
+    if (g_mode == Mode::GameOver) {
+        return;
+    }
+    if (g_death_reason == DeathReason::None) {
+        // HP が外部要因で0になった場合も結果を未確定のままにしない。
+        g_death_reason = DeathReason::ShotDown;
+    }
+    g_result = {g_score, g_wave, g_kills, g_play_tick, g_death_reason};
+    g_mode = Mode::GameOver;
+    g_msg_timer = 0;
+    g_banner_timer = 0;
+    for (auto& e : g_en) {
+        e.warning_timer = 0;
+    }
+    std::printf("MODE Play->GameOver frame=%lu wave=%d score=%d ticks=%lu reason=%d\r\n",
+                static_cast<unsigned long>(g_frame), g_wave, g_score,
+                static_cast<unsigned long>(g_play_tick),
+                static_cast<int>(g_death_reason));
+    audio::set_engine(0);
+    play_title_music();
+}
+
 // ---------------------------------------------------------------- 更新
 
-void fire_missile() {
+bool fire_missile() {
     if (g_pl.missiles <= 0) {
-        return;
+        set_msg("NO MISSILES");
+        return false;
     }
     for (auto& m : g_ms) {
         if (m.active) {
@@ -494,19 +714,34 @@ void fire_missile() {
         m.vx = static_cast<int32_t>((static_cast<int64_t>(v0) * fx) >> 12);
         m.vz = static_cast<int32_t>((static_cast<int64_t>(v0) * fz) >> 12);
         m.vy = static_cast<int32_t>((static_cast<int64_t>(v0) * sp) >> 12);
-        const bool locked = g_pl.lock_target >= 0 && g_pl.lock_timer >= 20 &&
-                            g_en[g_pl.lock_target].alive;
+        const bool locked = g_pl.lock_target >= 0 &&
+                            g_pl.lock_target < kMaxEnemies &&
+                            g_pl.lock_timer >= 20 &&
+                            rules::is_same_target(
+                                g_pl.lock_target, g_pl.lock_generation,
+                                g_pl.lock_target, g_en[g_pl.lock_target].alive,
+                                g_en[g_pl.lock_target].generation);
         m.target = locked ? g_pl.lock_target : -1;
+        m.target_generation = locked ? g_en[g_pl.lock_target].generation : 0;
         m.life = 150;  // 5 秒
         m.trail_n = 0;
         m.trail_head = 0;
         --g_pl.missiles;
         audio::play_sfx(audio::Sfx::Missile);
-        return;
+        return true;
     }
+    set_msg("MSL BUSY");
+    return false;
 }
 
-void update_player() {
+void update_player_motion() {
+    if (g_pl.dmg_flash > 0) {
+        --g_pl.dmg_flash;
+    }
+    if (g_pl.hit_flash > 0) {
+        --g_pl.hit_flash;
+    }
+
     // ロール / ヨー
     int roll_target = 0;
     if (g_in.down[keys::Left]) {
@@ -567,17 +802,8 @@ void update_player() {
         g_pl.speed_q8 = 150 * kQ8;
     }
 
-    // エンジン音: 速度 45..150 m/s を throttle 0..255 に写像
-    {
-        int32_t throttle = ((g_pl.speed_q8 - 45 * kQ8) * 255) / (105 * kQ8);
-        if (throttle < 0) {
-            throttle = 0;
-        }
-        if (throttle > 255) {
-            throttle = 255;
-        }
-        audio::set_engine(static_cast<uint8_t>(throttle));
-    }
+    // エンジン音: 速度を基準に、スロットル操作と操縦負荷も反映する。
+    set_engine_for_controls();
 
     // 移動
     const uint8_t yaw = static_cast<uint8_t>(g_pl.yaw_q8 >> 8);
@@ -600,6 +826,7 @@ void update_player() {
     // 墜落（爆発は 40m 前方に出してカメラから見えるようにする）
     if (g_pl.y < 4 * kQ8) {
         g_pl.hp = 0;
+        g_death_reason = DeathReason::Crash;
         g_crashed = true;
         const int32_t fx = fm::sin_q12(yaw);
         const int32_t fz = fm::cos_q12(yaw);
@@ -608,7 +835,54 @@ void update_player() {
                         g_pl.z + ((40 * kQ8 * fz) >> 12));
         return;
     }
+}
 
+bool enemy_reference_alive(int idx, uint32_t generation) {
+    if (idx < 0 || idx >= kMaxEnemies) {
+        return false;
+    }
+    return rules::is_same_target(idx, generation, idx, g_en[idx].alive,
+                                 g_en[idx].generation);
+}
+
+void update_guidance_target() {
+    // ロック対象を最優先にする。ロックが外れても、案内対象が生存中なら
+    // その機体を維持して、画面外へ出た瞬間に案内が飛び移らないようにする。
+    if (enemy_reference_alive(g_pl.lock_target, g_pl.lock_generation)) {
+        g_pl.guide_target = g_pl.lock_target;
+        g_pl.guide_generation = g_pl.lock_generation;
+        return;
+    }
+    if (enemy_reference_alive(g_pl.guide_target, g_pl.guide_generation)) {
+        return;
+    }
+
+    int best = -1;
+    uint64_t best_d2 = 0;
+    for (int i = 0; i < kMaxEnemies; ++i) {
+        const Enemy& e = g_en[i];
+        if (!e.alive) {
+            continue;
+        }
+        const int64_t dx = e.x - g_pl.x;
+        const int64_t dy = e.y - g_pl.y;
+        const int64_t dz = e.z - g_pl.z;
+        const uint64_t d2 = static_cast<uint64_t>(dx * dx + dy * dy + dz * dz);
+        if (best < 0 || d2 < best_d2) {
+            best = i;
+            best_d2 = d2;
+        }
+    }
+    if (best >= 0) {
+        g_pl.guide_target = best;
+        g_pl.guide_generation = g_en[best].generation;
+    } else {
+        g_pl.guide_target = -1;
+        g_pl.guide_generation = 0;
+    }
+}
+
+void update_player_weapons() {
     // 機銃
     if (g_pl.gun_cd > 0) {
         --g_pl.gun_cd;
@@ -629,8 +903,10 @@ void update_player() {
                 e.sx > kCx - 10 && e.sx < kCx + 10 &&
                 e.sy > kReticleY - 10 && e.sy < kReticleY + 10) {
                 e.hp -= 9;
+                g_pl.hit_flash = 5;
                 if (e.hp <= 0) {
                     e.alive = false;
+                    ++g_kills;
                     spawn_explosion(e.x, e.y, e.z);
                     const int reward = enemy_stats(e.type).score;
                     g_score += reward;
@@ -664,7 +940,8 @@ void update_player() {
         }
     }
     if (best >= 0) {
-        if (g_pl.lock_target == best) {
+        if (g_pl.lock_target == best &&
+            g_pl.lock_generation == g_en[best].generation) {
             if (g_pl.lock_timer < 60) {
                 ++g_pl.lock_timer;
                 if (g_pl.lock_timer == 20) {
@@ -673,21 +950,22 @@ void update_player() {
             }
         } else {
             g_pl.lock_target = best;
+            g_pl.lock_generation = g_en[best].generation;
             g_pl.lock_timer = 0;
         }
     } else {
         g_pl.lock_target = -1;
+        g_pl.lock_generation = 0;
         g_pl.lock_timer = 0;
     }
+
+    update_guidance_target();
 
     // ミサイル発射
     if (g_in.pressed['M']) {
         fire_missile();
     }
 
-    if (g_pl.dmg_flash > 0) {
-        --g_pl.dmg_flash;
-    }
 }
 
 void steer_enemy_towards(Enemy& e, uint8_t desired, int max_step_q8) {
@@ -704,8 +982,14 @@ void steer_enemy_towards(Enemy& e, uint8_t desired, int max_step_q8) {
 }
 
 bool missile_targets(int enemy_idx) {
+    if (enemy_idx < 0 || enemy_idx >= kMaxEnemies || !g_en[enemy_idx].alive) {
+        return false;
+    }
+    const uint32_t generation = g_en[enemy_idx].generation;
     for (const auto& m : g_ms) {
-        if (m.active && m.target == enemy_idx) {
+        if (m.active && rules::is_same_target(
+                             m.target, m.target_generation, enemy_idx, true,
+                             generation)) {
             return true;
         }
     }
@@ -793,39 +1077,64 @@ void update_enemy(int idx) {
     e.z += static_cast<int32_t>(
         (static_cast<int64_t>(e.speed_q8) * fm::cos_q12(yaw)) >> 12) / 30;
 
-    // 攻撃（プレイヤーが正面コーンに入っていれば射撃）
+    // 攻撃（プレイヤーが正面コーンに入っていれば、まず予告してから射撃）
     if (e.fire_cd > 0) {
         --e.fire_cd;
     }
-    if (e.mode == EnemyMode::Attack && dist_m < 550 && dist_m > 40) {
-        const uint8_t bearing = fm::atan2_brad(
-            static_cast<int32_t>(dx >> 8), static_cast<int32_t>(dz >> 8));
-        const int8_t diff = static_cast<int8_t>(bearing - yaw);
-        if (diff > -6 && diff < 6 && e.fire_cd == 0) {
-            e.fire_cd = stats.fire_cd;
-            if (static_cast<int>(fm::rnd() % 100) < stats.hit_pct) {
-                g_pl.hp -= stats.player_dmg;
-                g_pl.dmg_flash = 8;
-                audio::play_sfx(audio::Sfx::Hit);
-                set_msg("TAKING FIRE!");
-                if (g_pl.hp <= 0) {
-                    g_pl.hp = 0;
+    if (e.mode != EnemyMode::Attack) {
+        e.warning_timer = 0;
+    } else {
+        const int64_t attack_dx = g_pl.x - e.x;
+        const int64_t attack_dz = g_pl.z - e.z;
+        const uint32_t attack_dist_m = fm::isqrt64(
+            static_cast<uint64_t>(attack_dx * attack_dx +
+                                  attack_dz * attack_dz)) >> 8;
+        const int64_t attack_dy = g_pl.y - e.y;
+        const uint8_t attack_bearing = fm::atan2_brad(
+            static_cast<int32_t>(attack_dx >> 8),
+            static_cast<int32_t>(attack_dz >> 8));
+        const int8_t attack_diff = static_cast<int8_t>(attack_bearing - yaw);
+        const bool attack_geometry =
+            attack_dist_m < 550 && attack_dist_m > 40 &&
+            attack_diff > -6 && attack_diff < 6 &&
+            attack_dy > -kAttackAltitudeToleranceM * kQ8 &&
+            attack_dy < kAttackAltitudeToleranceM * kQ8;
+
+        if (!attack_geometry) {
+            // 予告後に旋回・上昇などで射線を外せば、その攻撃を取り消す。
+            e.warning_timer = 0;
+        } else if (e.warning_timer > 0) {
+            --e.warning_timer;
+            if (e.warning_timer == 0 && e.fire_cd == 0) {
+                e.fire_cd = stats.fire_cd;
+                if (static_cast<int>(fm::rnd() % 100) < stats.hit_pct) {
+                    apply_player_damage(stats.player_dmg, DeathReason::ShotDown);
+                    audio::play_sfx(audio::Sfx::Hit);
+                    set_msg("TAKING FIRE!");
+                    if (g_death_reason != DeathReason::None) {
+                        return;
+                    }
                 }
             }
+        } else if (e.fire_cd == 0) {
+            e.warning_timer = kAttackWarningFrames;
         }
     }
 
     // 体当たり判定
+    const int64_t collision_dx = g_pl.x - e.x;
     const int64_t dy = g_pl.y - e.y;
-    const uint64_t d2 = static_cast<uint64_t>(dx * dx + dy * dy + dz * dz);
+    const int64_t collision_dz = g_pl.z - e.z;
+    const uint64_t d2 = static_cast<uint64_t>(
+        collision_dx * collision_dx + dy * dy + collision_dz * collision_dz);
     const uint64_t rr = static_cast<uint64_t>(25 * kQ8) * (25 * kQ8);
     if (d2 < rr) {
         e.alive = false;
         spawn_explosion(e.x, e.y, e.z);
-        g_pl.hp -= stats.collision_dmg;
-        g_pl.dmg_flash = 12;
         g_score += stats.score / 2;
         set_msg("MIDAIR COLLISION!");
+        apply_player_damage(stats.collision_dmg, DeathReason::Collision);
+        g_pl.dmg_flash = 12;
     }
 }
 
@@ -839,8 +1148,11 @@ void update_missiles() {
             continue;
         }
 
-        // 誘導
-        if (m.target >= 0 && g_en[m.target].alive) {
+        // 誘導。敵スロットが再利用されても、世代が違う機体は追跡しない。
+        if (m.target >= 0 && m.target < kMaxEnemies &&
+            rules::is_same_target(
+                m.target, m.target_generation, m.target, g_en[m.target].alive,
+                g_en[m.target].generation)) {
             const Enemy& t = g_en[m.target];
             const int64_t dx = t.x - m.x;
             const int64_t dy = t.y - m.y;
@@ -856,6 +1168,9 @@ void update_missiles() {
                 m.vy += (wy - m.vy) >> 3;
                 m.vz += (wz - m.vz) >> 3;
             }
+        } else if (m.target >= 0) {
+            m.target = -1;
+            m.target_generation = 0;
         }
 
         // 煙トレイル（2 フレームに 1 点）
@@ -891,6 +1206,7 @@ void update_missiles() {
             if (d2 < rr) {
                 m.active = false;
                 t.alive = false;
+                ++g_kills;
                 spawn_explosion(t.x, t.y, t.z);
                 const int reward = enemy_stats(t.type).score;
                 g_score += reward;
@@ -912,10 +1228,32 @@ void update_explosions() {
 }
 
 void update_play() {
-    update_player();
+    ++g_play_tick;
+
+    update_player_motion();
+    if (g_death_reason != DeathReason::None) {
+        finalize_gameover();
+        return;
+    }
+
     for (int i = 0; i < kMaxEnemies; ++i) {
         update_enemy(i);
+        if (g_death_reason != DeathReason::None) {
+            finalize_gameover();
+            return;
+        }
     }
+
+    // 武器判定とHUDが同じフレームの姿勢・敵位置を使うように、敵の移動後に
+    // カメラ変換と投影キャッシュを更新する。
+    update_camera_transform();
+    refresh_enemy_projection();
+    update_player_weapons();
+    if (g_death_reason != DeathReason::None) {
+        finalize_gameover();
+        return;
+    }
+
     update_missiles();
     update_explosions();
 
@@ -926,16 +1264,8 @@ void update_play() {
         --g_msg_timer;
     }
 
-    if (g_pl.hp <= 0) {
-        g_mode = Mode::GameOver;
-        std::printf("MODE Play->GameOver frame=%lu wave=%d score=%d\r\n",
-                   static_cast<unsigned long>(g_frame), g_wave, g_score);
-        audio::set_engine(0);
-        audio::music_play(bgm::kLeadNotes, bgm::kLeadNotesCount,
-                          bgm::kArpNotes, bgm::kArpNotesCount,
-                          bgm::kChordNotes, bgm::kChordNotesCount,
-                          bgm::kBassNotes, bgm::kBassNotesCount,
-                          bgm::kDrumNotes, bgm::kDrumNotesCount, true);
+    if (g_pl.hp <= 0 || g_death_reason != DeathReason::None) {
+        finalize_gameover();
         return;
     }
 
@@ -949,6 +1279,9 @@ void update_play() {
     if (!any_alive && g_banner_timer == 0) {
         g_score += 200;  // ウェーブクリアボーナス
         start_wave(g_wave + 1);
+        // 新しいウェーブの敵も生成直後のフレームから同じ投影キャッシュを使う。
+        update_camera_transform();
+        refresh_enemy_projection();
     }
 }
 
@@ -968,26 +1301,7 @@ uint16_t sky_color(int d) {
 }
 
 void render_background() {
-    const int8_t pitch = static_cast<int8_t>(g_pl.pitch_q8 >> 8);
-    const int32_t tan_p = fm::tan_q12(pitch);
-    g_hy = kCy + static_cast<int>((static_cast<int64_t>(kFocal) * tan_p) >> 12);
-    if (g_hy < -400) {
-        g_hy = -400;
-    }
-    if (g_hy > 560) {
-        g_hy = 560;
-    }
-
-    const int32_t roll = -g_pl.roll;
-    g_cosr = fm::cos_q12(static_cast<uint8_t>(roll & 0xff));
-    g_sinr = fm::sin_q12(static_cast<uint8_t>(roll & 0xff));
-    g_slope_q8 = fm::tan_q12(roll) >> 4;
-    if (g_slope_q8 > 900) {
-        g_slope_q8 = 900;
-    }
-    if (g_slope_q8 < -900) {
-        g_slope_q8 = -900;
-    }
+    update_camera_transform();
 
     // 前進距離（地面ストライプのスクロール用）
     const uint8_t yaw = static_cast<uint8_t>(g_pl.yaw_q8 >> 8);
@@ -1127,18 +1441,10 @@ void render_entities() {
             e.vis = false;
             continue;
         }
-        const Proj p = project(e.x, e.y, e.z);
-        e.vis = p.ok;
-        if (!p.ok) {
+        if (!e.vis) {
             continue;
         }
-        e.sx = p.sx;
-        e.sy = p.sy;
-        e.zc = p.zc;
-        const int32_t wingspan_m = enemy_stats(e.type).wingspan_m;
-        e.pixw = static_cast<int>(
-            (static_cast<int64_t>(wingspan_m * kFocal) * kQ8) / p.zc);
-        items[n++] = {p.zc, 0, static_cast<uint8_t>(i), p.sx, p.sy};
+        items[n++] = {e.zc, 0, static_cast<uint8_t>(i), e.sx, e.sy};
     }
     for (int i = 0; i < kMaxMissiles; ++i) {
         const Missile& m = g_ms[i];
@@ -1247,6 +1553,185 @@ void render_player_plane() {
     }
 }
 
+int clamp_screen_edge(int value) {
+    if (value < 8) {
+        return 8;
+    }
+    if (value > gfx::kWidth - 9) {
+        return gfx::kWidth - 9;
+    }
+    return value;
+}
+
+bool projection_screen_point(const Proj& p, int* sx, int* sy) {
+    if (p.zc <= 0) {
+        return false;
+    }
+    const int32_t depth = p.zc < 3 * kQ8 ? 3 * kQ8 : p.zc;
+    const int sx0 = kCx + static_cast<int>(
+        (static_cast<int64_t>(p.xc) * kFocal) / depth);
+    const int sy0 = kCy - static_cast<int>(
+        (static_cast<int64_t>(p.yc) * kFocal) / depth);
+    apply_roll(sx0, sy0, sx, sy);
+    return true;
+}
+
+bool edge_arrow_for_projection(const Proj& p, int* dir_x, int* dir_y,
+                               int* arrow_x, int* arrow_y) {
+    if (p.zc <= 0) {
+        // 背後の目標は、旋回方向を迷わせないため右旋回を固定で案内する。
+        *dir_x = 1;
+        *dir_y = p.yc >= 0 ? 1 : -1;
+    } else {
+        int sx;
+        int sy;
+        if (!projection_screen_point(p, &sx, &sy)) {
+            return false;
+        }
+        if (sx >= 0 && sx < gfx::kWidth && sy >= 0 && sy < gfx::kHeight) {
+            return false;
+        }
+        *dir_x = sx - kCx;
+        *dir_y = sy - kReticleY;
+    }
+
+    if (*dir_x == 0 && *dir_y == 0) {
+        *dir_y = -1;
+    }
+    const int adx = *dir_x >= 0 ? *dir_x : -*dir_x;
+    const int ady = *dir_y >= 0 ? *dir_y : -*dir_y;
+    int ax;
+    int ay;
+    if (adx >= ady && adx > 0) {
+        ax = *dir_x >= 0 ? gfx::kWidth - 9 : 8;
+        ay = kReticleY + *dir_y * (ax > kCx ? ax - kCx : kCx - ax) / adx;
+    } else {
+        ay = *dir_y >= 0 ? gfx::kHeight - 9 : 8;
+        ax = kCx + *dir_x * (ay > kReticleY ? ay - kReticleY
+                                             : kReticleY - ay) / ady;
+    }
+    *arrow_x = clamp_screen_edge(ax);
+    *arrow_y = clamp_screen_edge(ay);
+    return true;
+}
+
+void draw_guidance_arrow(int x, int y, int dx, int dy, uint16_t color) {
+    const int adx = dx >= 0 ? dx : -dx;
+    const int ady = dy >= 0 ? dy : -dy;
+    if (adx >= ady) {
+        if (dx >= 0) {
+            gfx::line(x - 5, y - 4, x, y, color);
+            gfx::line(x - 5, y + 4, x, y, color);
+        } else {
+            gfx::line(x + 5, y - 4, x, y, color);
+            gfx::line(x + 5, y + 4, x, y, color);
+        }
+        if (ady > 16) {
+            const int marker_y = clamp_screen_edge(y + (dy < 0 ? -8 : 8));
+            if (dy < 0) {
+                gfx::line(x - 3, marker_y + 3, x, marker_y, color);
+                gfx::line(x, marker_y, x + 3, marker_y + 3, color);
+            } else {
+                gfx::line(x - 3, marker_y - 3, x, marker_y, color);
+                gfx::line(x, marker_y, x + 3, marker_y - 3, color);
+            }
+        }
+        return;
+    }
+
+    if (dy >= 0) {
+        gfx::line(x - 4, y - 5, x, y, color);
+        gfx::line(x + 4, y - 5, x, y, color);
+    } else {
+        gfx::line(x - 4, y + 5, x, y, color);
+        gfx::line(x + 4, y + 5, x, y, color);
+    }
+    if (adx > 16) {
+        const int marker_x = clamp_screen_edge(x + (dx < 0 ? -8 : 8));
+        if (dx < 0) {
+            gfx::line(marker_x + 3, y - 3, marker_x, y, color);
+            gfx::line(marker_x, y, marker_x + 3, y + 3, color);
+        } else {
+            gfx::line(marker_x - 3, y - 3, marker_x, y, color);
+            gfx::line(marker_x, y, marker_x - 3, y + 3, color);
+        }
+    }
+}
+
+void render_guidance_arrow() {
+    if (!enemy_reference_alive(g_pl.guide_target, g_pl.guide_generation)) {
+        return;
+    }
+    const Enemy& target = g_en[g_pl.guide_target];
+    const Proj p = project(target.x, target.y, target.z);
+    int dir_x;
+    int dir_y;
+    int ax;
+    int ay;
+    if (edge_arrow_for_projection(p, &dir_x, &dir_y, &ax, &ay)) {
+        draw_guidance_arrow(ax, ay, dir_x, dir_y, kColYellow);
+    }
+}
+
+void render_attack_warning() {
+    int warning_target = -1;
+    uint64_t nearest_d2 = 0;
+    for (int i = 0; i < kMaxEnemies; ++i) {
+        const Enemy& e = g_en[i];
+        if (!e.alive || e.warning_timer <= 0) {
+            continue;
+        }
+        const int64_t dx = e.x - g_pl.x;
+        const int64_t dy = e.y - g_pl.y;
+        const int64_t dz = e.z - g_pl.z;
+        const uint64_t d2 = static_cast<uint64_t>(dx * dx + dy * dy + dz * dz);
+        if (warning_target < 0 || d2 < nearest_d2) {
+            warning_target = i;
+            nearest_d2 = d2;
+        }
+    }
+    if (warning_target < 0) {
+        return;
+    }
+
+    const Enemy& attacker = g_en[warning_target];
+    gfx::text(kCx - gfx::text_width("INCOMING") / 2, 28, "INCOMING", kColRed);
+    constexpr int kWarningBarW = 30;
+    const int bar_x = kCx - kWarningBarW / 2;
+    gfx::rect_outline(bar_x, 37, kWarningBarW + 2, 4, kColRed);
+    const int fill_w = attacker.warning_timer * kWarningBarW /
+                       kAttackWarningFrames;
+    if (fill_w > 0) {
+        gfx::fill_rect(bar_x + 1, 38, fill_w, 2, kColRed);
+    }
+
+    const Proj p = project(attacker.x, attacker.y, attacker.z);
+    int sx;
+    int sy;
+    if (projection_screen_point(p, &sx, &sy) &&
+        sx >= 0 && sx < gfx::kWidth && sy >= 0 && sy < gfx::kHeight) {
+        int half = attacker.pixw / 2 + 4;
+        if (half < 6) {
+            half = 6;
+        }
+        if (half > 18) {
+            half = 18;
+        }
+        if (g_frame & 2) {
+            gfx::rect_outline(sx - half, sy - half, half * 2 + 1,
+                              half * 2 + 1, kColRed);
+        }
+    } else {
+        int dir_x;
+        int dir_y;
+        int ax;
+        int ay;
+        if (edge_arrow_for_projection(p, &dir_x, &dir_y, &ax, &ay)) {
+            draw_guidance_arrow(ax, ay, dir_x, dir_y, kColRed);
+        }
+    }
+}
+
 // ---------------------------------------------------------------- HUD
 
 void render_hud() {
@@ -1262,15 +1747,35 @@ void render_hud() {
 
     // 機銃トレーサ
     if (g_pl.gun_flash > 0) {
-        const int jx = static_cast<int>(fm::rnd() % 5) - 2;
+        const int jx = static_cast<int>(fm::rnd_fx() % 5) - 2;
         gfx::line(64, 132, kCx + jx, kReticleY + 2, kColYellow);
         gfx::line(96, 132, kCx + jx, kReticleY + 2, kColYellow);
     }
+    if (g_pl.hit_flash > 0) {
+        const int d = 14;
+        const int len = 4;
+        gfx::line(kCx - d, kReticleY - d, kCx - d + len, kReticleY - d,
+                  kColYellow);
+        gfx::line(kCx - d, kReticleY - d, kCx - d, kReticleY - d + len,
+                  kColYellow);
+        gfx::line(kCx + d, kReticleY - d, kCx + d - len, kReticleY - d,
+                  kColYellow);
+        gfx::line(kCx + d, kReticleY - d, kCx + d, kReticleY - d + len,
+                  kColYellow);
+        gfx::line(kCx - d, kReticleY + d, kCx - d + len, kReticleY + d,
+                  kColYellow);
+        gfx::line(kCx - d, kReticleY + d, kCx - d, kReticleY + d - len,
+                  kColYellow);
+        gfx::line(kCx + d, kReticleY + d, kCx + d - len, kReticleY + d,
+                  kColYellow);
+        gfx::line(kCx + d, kReticleY + d, kCx + d, kReticleY + d - len,
+                  kColYellow);
+    }
 
     // ロックオン枠
-    if (g_pl.lock_target >= 0) {
+    if (g_pl.lock_target >= 0 && g_pl.lock_target < kMaxEnemies) {
         const Enemy& e = g_en[g_pl.lock_target];
-        if (e.alive && e.vis) {
+        if (e.alive && e.vis && e.generation == g_pl.lock_generation) {
             const bool locked = g_pl.lock_timer >= 20;
             const uint16_t c = locked ? kColRed : kColHudGreen;
             int half = e.pixw / 2 + 5;
@@ -1297,8 +1802,26 @@ void render_hud() {
             // 距離表示
             std::snprintf(buf, sizeof(buf), "%ld", static_cast<long>(e.zc >> 8));
             gfx::text(e.sx + half + 2, e.sy - 3, buf, c);
+
+            // ロック成立までの20フレームを照準下のゲージで示す。
+            constexpr int kLockFrames = 20;
+            constexpr int kGaugeW = 30;
+            const int gauge_x = kCx - kGaugeW / 2;
+            const int gauge_y = kReticleY + 16;
+            gfx::rect_outline(gauge_x, gauge_y, kGaugeW + 2, 4, kColHudDim);
+            int progress = g_pl.lock_timer;
+            if (progress > kLockFrames) {
+                progress = kLockFrames;
+            }
+            if (progress > 0) {
+                const int fill_w = progress * kGaugeW / kLockFrames;
+                gfx::fill_rect(gauge_x + 1, gauge_y + 1, fill_w, 2, c);
+            }
         }
     }
+
+    render_attack_warning();
+    render_guidance_arrow();
 
     // レーダー（左下）
     const int rx = 21;
@@ -1320,20 +1843,24 @@ void render_hud() {
             const int64_t dz = e.z - g_pl.z;
             int32_t xr = static_cast<int32_t>((dx * c - dz * s) >> 12) >> 8;
             int32_t zr = static_cast<int32_t>((dx * s + dz * c) >> 12) >> 8;
-            // 100m = 1px、レーダー円に収める
+            // 100m = 1px。各軸ではなくベクトル全体を円の半径に収める。
             xr /= 100;
             zr /= 100;
-            if (xr < -(rr - 2)) {
-                xr = -(rr - 2);
-            }
-            if (xr > rr - 2) {
-                xr = rr - 2;
-            }
-            if (zr < -(rr - 2)) {
-                zr = -(rr - 2);
-            }
-            if (zr > rr - 2) {
-                zr = rr - 2;
+            const int radar_limit = rr - 3;
+            const int64_t radar_d2 =
+                static_cast<int64_t>(xr) * xr +
+                static_cast<int64_t>(zr) * zr;
+            const int64_t radar_limit2 =
+                static_cast<int64_t>(radar_limit) * radar_limit;
+            if (radar_d2 > radar_limit2) {
+                const uint32_t radar_dist =
+                    fm::isqrt64(static_cast<uint64_t>(radar_d2));
+                if (radar_dist > 0) {
+                    xr = static_cast<int32_t>(
+                        static_cast<int64_t>(xr) * radar_limit / radar_dist);
+                    zr = static_cast<int32_t>(
+                        static_cast<int64_t>(zr) * radar_limit / radar_dist);
+                }
             }
             gfx::put_pixel(rx + xr, ry - zr, enemy_radar_color(e.type));
         }
@@ -1429,8 +1956,30 @@ void render_title() {
     }
 }
 
+void render_pause() {
+    render_play();
+    dim_framebuffer();
+    gfx::text(kCx - gfx::text_width("PAUSED", 2) / 2, 54, "PAUSED",
+              kColYellow, 2);
+    gfx::text(kCx - gfx::text_width("P/ENTER: RESUME") / 2, 84,
+              "P/ENTER: RESUME", kColWhite);
+    gfx::text(kCx - gfx::text_width("ESC: TITLE") / 2, 94,
+              "ESC: TITLE", kColWhite);
+}
+
+const char* death_reason_label(DeathReason reason) {
+    switch (reason) {
+        case DeathReason::Crash: return "CRASH";
+        case DeathReason::Collision: return "COLLISION";
+        case DeathReason::ShotDown: return "SHOT DOWN";
+        case DeathReason::None:
+        default: return "UNKNOWN";
+    }
+}
+
 void render_gameover() {
     render_background();
+    refresh_enemy_projection();
     render_entities();
     render_hud();
     dim_framebuffer();
@@ -1438,12 +1987,22 @@ void render_gameover() {
     char buf[24];
     gfx::text(kCx - gfx::text_width("GAME OVER", 2) / 2, 56, "GAME OVER",
               kColRed, 2);
-    std::snprintf(buf, sizeof(buf), "SCORE %06d", g_score);
+    std::snprintf(buf, sizeof(buf), "SCORE %06d", g_result.score);
     gfx::text(kCx - gfx::text_width(buf) / 2, 80, buf, kColWhite);
-    std::snprintf(buf, sizeof(buf), "WAVE %d", g_wave);
+    std::snprintf(buf, sizeof(buf), "WAVE %d", g_result.wave);
     gfx::text(kCx - gfx::text_width(buf) / 2, 90, buf, kColWhite);
+    std::snprintf(buf, sizeof(buf), "KILLS %d", g_result.kills);
+    gfx::text(kCx - gfx::text_width(buf) / 2, 100, buf, kColWhite);
+    const uint32_t total_seconds = g_result.play_ticks / 30;
+    std::snprintf(buf, sizeof(buf), "TIME %02lu:%02lu",
+                  static_cast<unsigned long>(total_seconds / 60),
+                  static_cast<unsigned long>(total_seconds % 60));
+    gfx::text(kCx - gfx::text_width(buf) / 2, 110, buf, kColWhite);
+    std::snprintf(buf, sizeof(buf), "CAUSE %s",
+                  death_reason_label(g_result.death_reason));
+    gfx::text(kCx - gfx::text_width(buf) / 2, 120, buf, kColRed);
     if (g_frame & 8) {
-        gfx::text(kCx - gfx::text_width("PRESS ENTER") / 2, 116,
+        gfx::text(kCx - gfx::text_width("PRESS ENTER") / 2, 136,
                   "PRESS ENTER", kColYellow);
     }
 }
@@ -1454,11 +2013,7 @@ void run() {
     fm::init();
     init_mirrored_art();
     g_pl.y = 600 * kQ8;
-    audio::music_play(bgm::kLeadNotes, bgm::kLeadNotesCount,
-                      bgm::kArpNotes, bgm::kArpNotesCount,
-                      bgm::kChordNotes, bgm::kChordNotesCount,
-                      bgm::kBassNotes, bgm::kBassNotesCount,
-                      bgm::kDrumNotes, bgm::kDrumNotesCount, true);
+    play_title_music();
 
     absolute_time_t next_frame = make_timeout_time_ms(kFrameMs);
     while (true) {
@@ -1478,32 +2033,17 @@ void run() {
 
         switch (g_mode) {
             case Mode::Title:
-                fm::rnd();  // タイトルで回して種を進める
                 if (g_in.pressed[keys::Enter]) {
-                    reset_game();
-                    g_mode = Mode::Play;
-                    audio::music_stop();
-                    std::printf("MODE Title->Play frame=%lu\r\n",
-                               static_cast<unsigned long>(g_frame));
+                    enter_play_from_reset("Title->Play");
+                    render_play();
+                } else {
+                    render_title();
                 }
-                render_title();
                 break;
             case Mode::Play:
-                if (g_in.pressed[keys::Escape]) {
-                    g_mode = Mode::Title;
-                    audio::set_engine(0);
-                    std::printf("MODE Play->Title(esc) frame=%lu\r\n",
-                               static_cast<unsigned long>(g_frame));
-                    audio::music_play(bgm::kLeadNotes,
-                                      bgm::kLeadNotesCount,
-                                      bgm::kArpNotes,
-                                      bgm::kArpNotesCount,
-                                      bgm::kChordNotes,
-                                      bgm::kChordNotesCount,
-                                      bgm::kBassNotes,
-                                      bgm::kBassNotesCount,
-                                      bgm::kDrumNotes,
-                                      bgm::kDrumNotesCount, true);
+                if (g_in.pressed['P'] || g_in.pressed[keys::Escape]) {
+                    enter_pause();
+                    render_pause();
                     break;
                 }
                 update_play();
@@ -1513,16 +2053,28 @@ void run() {
                     render_gameover();
                 }
                 break;
+            case Mode::Pause:
+                if (g_in.pressed[keys::Escape]) {
+                    enter_title("Pause->Title(esc)");
+                    render_title();
+                } else if (g_in.pressed['P'] || g_in.pressed[keys::Enter]) {
+                    resume_play();
+                    render_play();
+                } else {
+                    render_pause();
+                }
+                break;
             case Mode::GameOver:
-                update_missiles();
                 update_explosions();
-                for (int i = 0; i < kMaxEnemies; ++i) {
-                    update_enemy(i);
+                if (g_in.pressed[keys::Enter]) {
+                    enter_play_from_reset("GameOver->Play");
+                    render_play();
+                } else if (g_in.pressed[keys::Escape]) {
+                    enter_title("GameOver->Title(esc)");
+                    render_title();
+                } else {
+                    render_gameover();
                 }
-                if (g_in.pressed[keys::Enter] || g_in.pressed[keys::Escape]) {
-                    g_mode = Mode::Title;
-                }
-                render_gameover();
                 break;
         }
 
