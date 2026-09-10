@@ -65,7 +65,8 @@ supported target until separately tested.
       LCD, keyboard, simultaneous input, BGM/SFX/engine audio, SD screenshot
       success and no-card recovery, and power-cycle recovery. Repeat the smoke
       test above after the deferred 1.0.0 final build; the current v0.9.3
-      report does not identify the not-yet-built final UF2.
+      report does not identify the not-yet-built final UF2 and predates the
+      unreleased Wave aggression tuning.
 - [ ] Record a 20-minute upper-load play run and frame-time/memory evidence;
       the plan's provisional target is a 33 ms 95th-percentile frame. A
       separate two-minute production-BIN stability sample and a non-hardware

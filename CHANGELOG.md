@@ -10,6 +10,10 @@ Release preparation for v1.0.0 is tracked in
 [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md). No v1.0.0 firmware is
 claimed until the production build and the target-hardware gate are complete.
 
+- Increased enemy pressure by Wave: later enemies pursue sooner, turn faster,
+  move faster, and fire from a wider/longer solution with shorter cooldowns.
+  The attack warning remains in place so the stronger attack is still readable.
+
 ## [0.9.3] - 2026-09-10
 
 - Replaced the fixed demo presentation with the same play/update/render path as

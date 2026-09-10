@@ -53,7 +53,6 @@ constexpr int kMaxEnemies = 5;
 constexpr int kMaxMissiles = 4;
 constexpr int kMaxExplosions = 6;
 constexpr int kAttackWarningFrames = 18;  // 約0.6秒の予告
-constexpr int kAttackAltitudeToleranceM = 120;
 
 constexpr int32_t kQ8 = 256;
 
@@ -496,11 +495,16 @@ void spawn_enemy() {
         e.yaw_q8 = static_cast<uint16_t>(fm::rnd() & 0xffff);
         e.type = pick_enemy_type(g_wave);
         const EnemyStats stats = enemy_stats(e.type);
-        e.speed_q8 = fm::rnd_range(stats.speed_min, stats.speed_max) * kQ8;
+        e.speed_q8 = rules::scale_enemy_speed(
+            fm::rnd_range(stats.speed_min, stats.speed_max) * kQ8,
+            g_wave);
         e.hp = stats.hp;
         e.mode = EnemyMode::Cruise;
         e.turn_dir = (fm::rnd() & 1) ? 1 : -1;
-        e.timer = static_cast<int16_t>(fm::rnd_range(40, 120));
+        const rules::EnemyWaveTuning tuning = rules::enemy_wave_tuning(
+            g_wave, stats.attack_bias, stats.fire_cd, stats.hit_pct);
+        e.timer = static_cast<int16_t>(
+            fm::rnd_range(tuning.spawn_timer_min, tuning.spawn_timer_max));
         e.fire_cd = 30;
         e.warning_timer = 0;
         e.vis = false;
@@ -517,8 +521,11 @@ int enemies_for_wave(int wave) {
 void start_wave(int wave) {
     g_wave = wave;
     const int n = enemies_for_wave(wave);
-    std::printf("WAVE START wave=%d enemies=%d frame=%lu\r\n", wave, n,
-               static_cast<unsigned long>(g_frame));
+    const rules::EnemyWaveTuning tuning =
+        rules::enemy_wave_tuning(wave, 0, 26, 60);
+    std::printf("WAVE START wave=%d enemies=%d aggression=%d frame=%lu\r\n",
+                wave, n, tuning.aggression_level,
+                static_cast<unsigned long>(g_frame));
     for (int i = 0; i < n; ++i) {
         spawn_enemy();
     }
@@ -1098,6 +1105,8 @@ void update_enemy(int idx) {
     }
 
     const EnemyStats stats = enemy_stats(e.type);
+    const rules::EnemyWaveTuning tuning = rules::enemy_wave_tuning(
+        g_wave, stats.attack_bias, stats.fire_cd, stats.hit_pct);
     const int64_t dx = g_pl.x - e.x;
     const int64_t dz = g_pl.z - e.z;
     const uint32_t dist_m = fm::isqrt64(
@@ -1111,16 +1120,21 @@ void update_enemy(int idx) {
     }
 
     if (--e.timer <= 0) {
-        // モード遷移（attack_bias で Interceptor は積極的に、Bomber は
-        // 消極的に攻撃態勢へ入る）
+        // モード遷移（type固有のattack_biasに加え、Wave後半ほど攻撃態勢へ
+        // 入りやすくする。Interceptorは積極的、Bomberは相対的に消極的。）
         const uint32_t r = fm::rnd() % 100;
-        const int attack_th = 35 + stats.attack_bias;
+        const int attack_th = tuning.attack_chance_pct;
+        const bool close_pressure =
+            tuning.aggression_level >= 4 &&
+            dist_m < static_cast<uint32_t>(tuning.fire_distance_m);
         if (dist_m > 2500) {
             e.mode = EnemyMode::Attack;  // 離れすぎ → 追跡して戻る
             e.timer = 90;
-        } else if (static_cast<int>(r) < attack_th && dist_m < 900) {
+        } else if ((static_cast<int>(r) < attack_th || close_pressure) &&
+                   dist_m < static_cast<uint32_t>(tuning.attack_distance_m)) {
             e.mode = EnemyMode::Attack;
-            e.timer = static_cast<int16_t>(fm::rnd_range(60, 120));
+            e.timer = static_cast<int16_t>(fm::rnd_range(
+                tuning.attack_timer_min, tuning.attack_timer_max));
         } else if (r < 65) {
             e.mode = EnemyMode::Turn;
             e.turn_dir = (fm::rnd() & 1) ? 1 : -1;
@@ -1140,7 +1154,7 @@ void update_enemy(int idx) {
         case EnemyMode::Attack: {
             const uint8_t bearing = fm::atan2_brad(
                 static_cast<int32_t>(dx >> 8), static_cast<int32_t>(dz >> 8));
-            steer_enemy_towards(e, bearing, 190);
+            steer_enemy_towards(e, bearing, tuning.attack_turn_step_q8);
             break;
         }
         case EnemyMode::Evade:
@@ -1190,10 +1204,12 @@ void update_enemy(int idx) {
             static_cast<int32_t>(attack_dz >> 8));
         const int8_t attack_diff = static_cast<int8_t>(attack_bearing - yaw);
         const bool attack_geometry =
-            attack_dist_m < 550 && attack_dist_m > 40 &&
-            attack_diff > -6 && attack_diff < 6 &&
-            attack_dy > -kAttackAltitudeToleranceM * kQ8 &&
-            attack_dy < kAttackAltitudeToleranceM * kQ8;
+            attack_dist_m < static_cast<uint32_t>(tuning.fire_distance_m) &&
+            attack_dist_m > 40 &&
+            attack_diff > -tuning.fire_cone_brad &&
+            attack_diff < tuning.fire_cone_brad &&
+            attack_dy > -tuning.fire_altitude_tolerance_m * kQ8 &&
+            attack_dy < tuning.fire_altitude_tolerance_m * kQ8;
 
         if (!attack_geometry) {
             // 予告後に旋回・上昇などで射線を外せば、その攻撃を取り消す。
@@ -1201,8 +1217,8 @@ void update_enemy(int idx) {
         } else if (e.warning_timer > 0) {
             --e.warning_timer;
             if (e.warning_timer == 0 && e.fire_cd == 0) {
-                e.fire_cd = stats.fire_cd;
-                if (static_cast<int>(fm::rnd() % 100) < stats.hit_pct) {
+                e.fire_cd = static_cast<int16_t>(tuning.fire_cooldown_frames);
+                if (static_cast<int>(fm::rnd() % 100) < tuning.hit_pct) {
                     apply_player_damage(stats.player_dmg, DeathReason::ShotDown);
                     play_game_sfx(audio::Sfx::Hit);
                     set_msg("TAKING FIRE!");

@@ -91,10 +91,39 @@ void test_rng_reproducibility_and_separation() {
     expect(zero_seed == fm::rnd(), "zero seed maps to a reproducible default");
 }
 
+void test_enemy_wave_pressure_ramps() {
+    const rules::EnemyWaveTuning wave1 =
+        rules::enemy_wave_tuning(1, 0, 26, 60);
+    const rules::EnemyWaveTuning wave7 =
+        rules::enemy_wave_tuning(7, 0, 26, 60);
+    expect(wave1.aggression_level == 0,
+           "wave one keeps the baseline aggression level");
+    expect(wave7.aggression_level > wave1.aggression_level,
+           "later waves increase the aggression level");
+    expect(wave7.attack_chance_pct > wave1.attack_chance_pct,
+           "later waves enter attack mode more often");
+    expect(wave7.attack_distance_m > wave1.attack_distance_m,
+           "later waves start pursuit from farther away");
+    expect(wave7.attack_turn_step_q8 > wave1.attack_turn_step_q8,
+           "later waves turn toward the player faster");
+    expect(wave7.fire_cooldown_frames < wave1.fire_cooldown_frames,
+           "later waves fire with a shorter cooldown");
+    expect(wave7.fire_distance_m > wave1.fire_distance_m,
+           "later waves can fire from farther away");
+    expect(wave7.fire_cone_brad > wave1.fire_cone_brad,
+           "later waves have a wider firing solution");
+    expect(wave7.hit_pct > wave1.hit_pct,
+           "later waves have a higher hit chance");
+    expect(rules::scale_enemy_speed(100 * 256, 7) >
+               rules::scale_enemy_speed(100 * 256, 1),
+           "later waves move faster");
+}
+
 int main() {
     test_damage_latches_first_death_reason();
     test_target_generation();
     test_input_hold_is_blocked_until_release();
     test_rng_reproducibility_and_separation();
+    test_enemy_wave_pressure_ramps();
     return g_failures == 0 ? 0 : 1;
 }
