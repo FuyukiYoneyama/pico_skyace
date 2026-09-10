@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "name": "pico-skyace-pause-resume-product",
+  "description": "Verify pause/resume on the production binary with an official LCD framebuffer assertion and generous observation windows for LCD-transfer cost.",
+  "poll_ms": 10,
+  "steps": [
+    {
+      "op": "wait_until",
+      "label": "firmware initialized",
+      "condition": {"kind": "uart_contains", "text": "DISPLAY init ok (verified lcd_rgb565_pio driver, blocking mode)"},
+      "timeout_ms": 10000
+    },
+    {
+      "op": "key_events",
+      "label": "start Play",
+      "gap_ms": 50,
+      "events": [
+        {"state": "pressed", "code": 10},
+        {"state": "released", "code": 10}
+      ]
+    },
+    {"op": "wait", "ms": 500},
+    {
+      "op": "key_events",
+      "label": "pause",
+      "gap_ms": 50,
+      "events": [
+        {"state": "pressed", "code": 80},
+        {"state": "released", "code": 80}
+      ]
+    },
+    {
+      "op": "wait_until",
+      "label": "pause transition logged",
+      "condition": {"kind": "uart_contains", "text": "MODE Play->Pause"},
+      "timeout_ms": 10000
+    },
+    {
+      "op": "wait_until",
+      "label": "upper playfield stays stable while paused",
+      "condition": {"kind": "region_stable", "x": 0, "y": 0, "w": 320, "h": 230, "for_ms": 500},
+      "timeout_ms": 10000
+    },
+    {
+      "op": "key_events",
+      "label": "resume",
+      "gap_ms": 50,
+      "events": [
+        {"state": "pressed", "code": 80},
+        {"state": "released", "code": 80}
+      ]
+    },
+    {
+      "op": "wait_until",
+      "label": "resume transition logged",
+      "condition": {"kind": "uart_contains", "text": "MODE Pause->Play"},
+      "timeout_ms": 10000
+    },
+    {"op": "wait", "ms": 500},
+    {"op": "snapshot", "png": "play-after-resume.png"},
+    {
+      "op": "assert",
+      "label": "resumed play framebuffer is rendered",
+      "condition": {"kind": "region_non_black", "x": 0, "y": 0, "w": 320, "h": 320, "min": 1}
+    }
+  ]
+}

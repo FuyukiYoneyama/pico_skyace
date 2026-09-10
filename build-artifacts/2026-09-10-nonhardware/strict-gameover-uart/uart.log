@@ -1,0 +1,15 @@
+pico_skyace version 0.9.3
+BUILD ID time="Sep 10 2026 07:34:14"
+WATCHDOG_CAUSED_REBOOT=0
+set_sys_clock_khz(250000) ok=1 sysclk=250000 kHz
+LCD NESco-style init sequence sent 0x3A=0x65 RGB565
+DISPLAY init ok (verified lcd_rgb565_pio driver, blocking mode)
+KEYBOARD init ok i2c1 addr=0x1f hz=400000
+BACKLIGHT before=32
+BACKLIGHT set level=220 ok=1
+WAVE START wave=1 enemies=2 frame=0
+SPAWN wave=1 type=0
+SPAWN wave=1 type=0
+MODE Title->Play frame=0 time_us=422304
+MODE Play->GameOver frame=349 time_us=71157851 wave=1 score=0 ticks=349 reason=2
+MODE GameOver->Title(timeout) frame=406 time_us=81159000

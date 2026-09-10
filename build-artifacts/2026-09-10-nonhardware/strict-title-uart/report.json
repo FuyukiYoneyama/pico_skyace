@@ -1,0 +1,46 @@
+{
+  "schema_version": 8,
+  "backend_commit": "5d365c08191aaa3e490c8ac6d491df55e152ba2a",
+  "backend_build": {"commit": "5d365c08191aaa3e490c8ac6d491df55e152ba2a", "dirty": false},
+  "firmware": {"basename": "pico_skyace.bin", "sha256": "db495f5f2e36a0cd2fa0f4921679a3aac3adcb61861dded8a56eedc91ca467c6"},
+  "bootrom": {"basename": "bootrom-rp2040-b2.bin", "sha256": "9c19b46f068c21f90d200c514faad4a0d5cecfc978f155b8c9d25cb6bc2efd81", "executed": false},
+  "execution_model": "Serial",
+  "board": "none",
+  "lcd_variant": "pio-rgb565",
+  "boot": {"mode": "direct_boot_from_flash", "vtor_flash_offset": "0x0100"},
+  "step_quantum": 65536,
+  "cycle_limit": 20000000000,
+  "stop_pc": null,
+  "stop_reason": "scenario_done",
+  "cycles": 15164383040,
+  "elapsed_us": 60689541,
+  "pc": "0x10000dd2",
+  "exception": null,
+  "error": null,
+  "verdict": {"status": "pass", "reasons": [], "expected_stop_reason": "scenario_done", "required_uart_markers": [], "missing_uart_markers": []},
+  "unsupported_mmio": [],
+  "unsupported_mmio_truncated": false,
+  "keyboard": {
+    "attached": true, "addr": "0x1f",
+    "reg_selects": 296, "key_events_delivered": 0, "key_events_remaining": 0,
+    "key_events_dropped": 0, "key_events_overwritten": 0,
+    "battery_reads": 0, "backlight_writes": 1, "backlight": 0, "lcd_backlight": 208,
+    "config": "0xd2", "interrupt_status": "0x00", "caps_lock": false, "num_lock": false,
+    "unknown_reg_selects": 0, "unknown_reg_writes": 0, "last_unknown_reg": null
+  },
+  "scenario": {
+    "file": "title_demo_cycle_strict_uart.json",
+    "name": "pico-skyace-title-demo-cycle-strict-uart",
+    "description": "Guard the unmodified production title/demo deadlines with 33-second UART windows. The initialization window is 10 seconds because the cycle-accurate runner can spend several virtual seconds before the first UART line; no firmware timing is shortened.",
+    "status": "pass",
+    "poll_ms": 10,
+    "steps_total": 3,
+    "error": null,
+    "steps": [
+      {"index": 0, "op": "wait_until", "label": "firmware initialized", "status": "pass", "at_ms": 441, "at_cycles": 102299256, "detail": "302 UART bytes seen"},
+      {"index": 1, "op": "wait_until", "label": "title enters demo within the strict 33 s guard", "status": "pass", "at_ms": 30621, "at_cycles": 7647402071, "detail": "479 UART bytes seen"},
+      {"index": 2, "op": "wait_until", "label": "demo returns to title within the strict 33 s guard", "status": "pass", "at_ms": 60689, "at_cycles": 15164383040, "detail": "533 UART bytes seen"}
+    ]
+  },
+  "uart": {"bytes": 533, "sha256": "3514130feef35e1d749a9c7fd5c622f10ebd8cf6a620d6af694c3bf462ece137"}
+}

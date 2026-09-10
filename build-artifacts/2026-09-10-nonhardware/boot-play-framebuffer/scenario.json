@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "name": "pico-skyace-boot-play-smoke",
+  "description": "Boot the current firmware, enter Play, and confirm a rendered frame.",
+  "poll_ms": 5,
+  "steps": [
+    {
+      "op": "wait_until",
+      "label": "firmware initialized",
+      "condition": {"kind": "uart_contains", "text": "BACKLIGHT set level=220 ok=1"},
+      "timeout_ms": 3000
+    },
+    {
+      "op": "key_events",
+      "label": "press Enter",
+      "gap_ms": 50,
+      "events": [
+        {"state": "pressed", "code": 10},
+        {"state": "released", "code": 10}
+      ]
+    },
+    {"op": "wait", "ms": 1000},
+    {"op": "snapshot", "png": "play.png"},
+    {
+      "op": "assert",
+      "label": "play frame is rendered",
+      "condition": {"kind": "region_non_black", "x": 0, "y": 0, "w": 320, "h": 320, "min": 1}
+    }
+  ]
+}

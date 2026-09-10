@@ -31,8 +31,12 @@
 完全経路検証追記: 2026-09-10。製品BIN（短縮マクロなし）でTitle→Demo→Titleの
 30秒／30秒期限を公式LCDエミュレーターで、Play→GameOver→Titleの10秒期限を
 UART専用高速PIOシンクで完走させ、UARTの`time_us`とrunner reportを保存した。
-実機の音声・表示・電源・SDカード確認と、厳密33秒ガード／framebuffer版はなお
-未完了であり、[ビルド記録](validation/2026-09-10-demo/BUILD.md)と
+追加の厳密33秒UARTガード、直接リトライ、ポーズ復帰、武器・標的境界、SDあり／なし、
+音声操作入力、公式LCD framebufferの短時間シナリオも合格し、証跡を
+[`build-artifacts/2026-09-10-nonhardware/`](../build-artifacts/2026-09-10-nonhardware/)へ保存した。
+2分の代表上限負荷も例外・入力dropなしで完走した。ただし、GameOverの公式LCDを含む
+長時間framebuffer版、20分負荷＋フレーム時間計測、実機の音声・表示・電源・SD媒体・
+電源再投入はなお未完了であり、[ビルド記録](validation/2026-09-10-demo/BUILD.md)と
 [リリースチェックリスト](RELEASE_CHECKLIST.md)の未確認項目を維持する。
 
 ## 1. 目指す体験

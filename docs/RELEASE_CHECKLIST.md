@@ -39,16 +39,24 @@ supported target until separately tested.
       UART-only and uses a documented fast PIO sink because the full LCD model
       makes the deliberate 349-frame crash path impractical; its report is not
       a framebuffer/electrical-timing pass.
-- [ ] Run the strict 33-second UART guards and framebuffer variants, plus
-      direct retry, pause/resume, and the weapon/target edge cases; archive the
-      reports. The complete title/demo scenario needs an explicit runner budget
-      (the default `1,000,000,000` cycles stops before 30 seconds of firmware
-      time), for example `--cycles 20000000000`.
+- [x] Run the strict 33-second UART guards and the available framebuffer
+      variants, plus direct retry, pause/resume, and weapon/target edge cases;
+      reports are archived under
+      [`build-artifacts/2026-09-10-nonhardware/`](../build-artifacts/2026-09-10-nonhardware/).
+      The strict Title→Demo→Title and GameOver→Title guards use the production
+      BIN and pass with no exception, unsupported MMIO, or keyboard drops. The
+      GameOver guard is UART-only; a full-LCD GameOver framebuffer run remains
+      impractical in the current cycle-accurate model and is not claimed here.
+- [x] Exercise the production F5 path with an emulated FAT32 SD card and the
+      no-card fallback. The SD model reports zero protocol errors; the no-card
+      run explicitly reports detect-high, `no_card`, and mount failure recovery.
 - [ ] Verify the final UF2 on an actual standard RP2040 PicoCalc: cold boot,
       LCD, keyboard, simultaneous input, BGM/SFX/engine audio, SD screenshot
       success and no-card recovery, and power-cycle recovery.
 - [ ] Record a 20-minute upper-load play run and frame-time/memory evidence;
-      the plan's provisional target is a 33 ms 95th-percentile frame.
+      the plan's provisional target is a 33 ms 95th-percentile frame. A
+      separate two-minute production-BIN stability sample is archived, but it
+      does not satisfy this 20-minute gate.
 - [x] Existing title/gameplay images are explicitly labeled as historical; a
       final-firmware capture can replace them for the v1.0.0 release page.
 - [ ] Create the `v1.0.0` Git tag and GitHub Release, attaching the UF2 and its

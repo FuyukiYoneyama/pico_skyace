@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "name": "pico-skyace-upper-load-2m-product",
+  "description": "Representative two-minute production-binary upper-load run. Hold throttle, pitch, roll, and gun input while the normal Play update, enemy AI, collision, weapons, HUD, and LCD path continue. This is a stability sample, not the release-gate 20-minute run.",
+  "poll_ms": 10,
+  "steps": [
+    {
+      "op": "wait_until",
+      "label": "firmware initialized",
+      "condition": {"kind": "uart_contains", "text": "DISPLAY init ok (verified lcd_rgb565_pio driver, blocking mode)"},
+      "timeout_ms": 10000
+    },
+    {
+      "op": "key_events",
+      "label": "start Play",
+      "gap_ms": 50,
+      "events": [
+        {"state": "pressed", "code": 10},
+        {"state": "released", "code": 10}
+      ]
+    },
+    {
+      "op": "wait_until",
+      "label": "Play starts",
+      "condition": {"kind": "uart_contains", "text": "MODE Title->Play"},
+      "timeout_ms": 1000
+    },
+    {
+      "op": "key_events",
+      "label": "apply sustained upper-load controls",
+      "gap_ms": 50,
+      "events": [
+        {"state": "pressed", "code": 79},
+        {"state": "pressed", "code": 183},
+        {"state": "pressed", "code": 181},
+        {"state": "pressed", "code": 32},
+        {"state": "held", "code": 79},
+        {"state": "held", "code": 183},
+        {"state": "held", "code": 181},
+        {"state": "held", "code": 32}
+      ]
+    },
+    {
+      "op": "wait",
+      "label": "run the representative upper-load window",
+      "ms": 120000
+    },
+    {
+      "op": "key_events",
+      "label": "release sustained controls",
+      "gap_ms": 50,
+      "events": [
+        {"state": "released", "code": 79},
+        {"state": "released", "code": 183},
+        {"state": "released", "code": 181},
+        {"state": "released", "code": 32}
+      ]
+    },
+    {"op": "wait", "ms": 100}
+  ]
+}

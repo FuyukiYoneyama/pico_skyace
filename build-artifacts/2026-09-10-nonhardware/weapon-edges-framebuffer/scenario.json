@@ -1,0 +1,82 @@
+{
+  "schema": 1,
+  "name": "pico-skyace-weapon-target-edges-product",
+  "description": "Exercise the production weapon input edges: missile launch, four-slot saturation, gun plus throttle/roll input, and safe continued rendering. Target-generation validity remains covered by the host rules test.",
+  "poll_ms": 10,
+  "steps": [
+    {
+      "op": "wait_until",
+      "label": "firmware initialized",
+      "condition": {"kind": "uart_contains", "text": "DISPLAY init ok (verified lcd_rgb565_pio driver, blocking mode)"},
+      "timeout_ms": 10000
+    },
+    {
+      "op": "key_events",
+      "label": "start Play",
+      "gap_ms": 50,
+      "events": [
+        {"state": "pressed", "code": 10},
+        {"state": "released", "code": 10}
+      ]
+    },
+    {"op": "wait", "ms": 250},
+    {
+      "op": "key_events",
+      "label": "launch first missile",
+      "gap_ms": 50,
+      "events": [
+        {"state": "pressed", "code": 77},
+        {"state": "released", "code": 77}
+      ]
+    },
+    {
+      "op": "wait_until",
+      "label": "missile HUD changes after launch",
+      "condition": {"kind": "region_changed", "x": 200, "y": 280, "w": 120, "h": 40},
+      "timeout_ms": 10000
+    },
+    {
+      "op": "key_events",
+      "label": "fill all missile slots and hit the busy edge",
+      "gap_ms": 120,
+      "events": [
+        {"state": "pressed", "code": 77},
+        {"state": "released", "code": 77},
+        {"state": "pressed", "code": 77},
+        {"state": "released", "code": 77},
+        {"state": "pressed", "code": 77},
+        {"state": "released", "code": 77},
+        {"state": "pressed", "code": 77},
+        {"state": "released", "code": 77},
+        {"state": "pressed", "code": 77},
+        {"state": "released", "code": 77}
+      ]
+    },
+    {"op": "wait", "ms": 250},
+    {
+      "op": "key_events",
+      "label": "hold gun with throttle and roll",
+      "gap_ms": 50,
+      "events": [
+        {"state": "pressed", "code": 32},
+        {"state": "pressed", "code": 79},
+        {"state": "pressed", "code": 183},
+        {"state": "held", "code": 32},
+        {"state": "held", "code": 79},
+        {"state": "held", "code": 183},
+        {"state": "held", "code": 32},
+        {"state": "held", "code": 79},
+        {"state": "held", "code": 183},
+        {"state": "released", "code": 32},
+        {"state": "released", "code": 79},
+        {"state": "released", "code": 183}
+      ]
+    },
+    {"op": "wait", "ms": 500},
+    {
+      "op": "assert",
+      "label": "combat frame remains rendered",
+      "condition": {"kind": "region_non_black", "x": 0, "y": 0, "w": 320, "h": 320, "min": 1}
+    }
+  ]
+}

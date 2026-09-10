@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "name": "pico-skyace-title-demo-cycle-strict-uart",
+  "description": "Guard the unmodified production title/demo deadlines with 33-second UART windows. The initialization window is 10 seconds because the cycle-accurate runner can spend several virtual seconds before the first UART line; no firmware timing is shortened.",
+  "poll_ms": 10,
+  "steps": [
+    {
+      "op": "wait_until",
+      "label": "firmware initialized",
+      "condition": {"kind": "uart_contains", "text": "DISPLAY init ok (verified lcd_rgb565_pio driver, blocking mode)"},
+      "timeout_ms": 10000
+    },
+    {
+      "op": "wait_until",
+      "label": "title enters demo within the strict 33 s guard",
+      "condition": {"kind": "uart_contains", "text": "MODE Title->Demo"},
+      "timeout_ms": 33000
+    },
+    {
+      "op": "wait_until",
+      "label": "demo returns to title within the strict 33 s guard",
+      "condition": {"kind": "uart_contains", "text": "MODE Demo->Title(timeout)"},
+      "timeout_ms": 33000
+    }
+  ]
+}

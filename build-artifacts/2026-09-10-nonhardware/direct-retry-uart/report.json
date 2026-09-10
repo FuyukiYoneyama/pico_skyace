@@ -1,0 +1,53 @@
+{
+  "schema_version": 8,
+  "backend_commit": "5d365c08191aaa3e490c8ac6d491df55e152ba2a",
+  "backend_build": {"commit": "5d365c08191aaa3e490c8ac6d491df55e152ba2a", "dirty": false},
+  "firmware": {"basename": "pico_skyace.bin", "sha256": "db495f5f2e36a0cd2fa0f4921679a3aac3adcb61861dded8a56eedc91ca467c6"},
+  "bootrom": {"basename": "bootrom-rp2040-b2.bin", "sha256": "9c19b46f068c21f90d200c514faad4a0d5cecfc978f155b8c9d25cb6bc2efd81", "executed": false},
+  "execution_model": "Serial",
+  "board": "none",
+  "lcd_variant": "pio-rgb565",
+  "boot": {"mode": "direct_boot_from_flash", "vtor_flash_offset": "0x0100"},
+  "step_quantum": 65536,
+  "cycle_limit": 25000000000,
+  "stop_pc": null,
+  "stop_reason": "scenario_done",
+  "cycles": 17863322460,
+  "elapsed_us": 71485299,
+  "pc": "0x10000dd0",
+  "exception": null,
+  "error": null,
+  "verdict": {"status": "pass", "reasons": [], "expected_stop_reason": "scenario_done", "required_uart_markers": [], "missing_uart_markers": []},
+  "unsupported_mmio": [],
+  "unsupported_mmio_truncated": false,
+  "keyboard": {
+    "attached": true, "addr": "0x1f",
+    "reg_selects": 368, "key_events_delivered": 8, "key_events_remaining": 0,
+    "key_events_dropped": 0, "key_events_overwritten": 0,
+    "battery_reads": 0, "backlight_writes": 1, "backlight": 0, "lcd_backlight": 208,
+    "config": "0xd2", "interrupt_status": "0x08", "caps_lock": false, "num_lock": false,
+    "unknown_reg_selects": 0, "unknown_reg_writes": 0, "last_unknown_reg": null
+  },
+  "scenario": {
+    "file": "gameover_direct_retry_product.json",
+    "name": "pico-skyace-gameover-direct-retry-product",
+    "description": "Run the real collision path, then use Enter on GameOver to retry directly without waiting for the 10-second title return.",
+    "status": "pass",
+    "poll_ms": 10,
+    "steps_total": 10,
+    "error": null,
+    "steps": [
+      {"index": 0, "op": "wait_until", "label": "firmware initialized", "status": "pass", "at_ms": 441, "at_cycles": 102299256, "detail": "302 UART bytes seen"},
+      {"index": 1, "op": "key_events", "label": "start Play", "status": "pass", "at_ms": 491, "at_cycles": 114816767, "detail": "sent 2 raw key event(s)"},
+      {"index": 2, "op": "wait", "label": null, "status": "pass", "at_ms": 691, "at_cycles": 164821224, "detail": "waited 200 ms"},
+      {"index": 3, "op": "key_events", "label": "hold throttle and nose down until crash", "status": "pass", "at_ms": 691, "at_cycles": 164821224, "detail": "sent 2 raw key event(s)"},
+      {"index": 4, "op": "wait_until", "label": "play enters game over", "status": "pass", "at_ms": 71194, "at_cycles": 17790511350, "detail": "535 UART bytes seen"},
+      {"index": 5, "op": "wait", "label": null, "status": "pass", "at_ms": 71294, "at_cycles": 17815546361, "detail": "waited 100 ms"},
+      {"index": 6, "op": "key_events", "label": "release crash inputs", "status": "pass", "at_ms": 71294, "at_cycles": 17815546361, "detail": "sent 2 raw key event(s)"},
+      {"index": 7, "op": "key_events", "label": "retry directly from game over", "status": "pass", "at_ms": 71344, "at_cycles": 17828063854, "detail": "sent 2 raw key event(s)"},
+      {"index": 8, "op": "wait_until", "label": "direct retry enters Play", "status": "pass", "at_ms": 71385, "at_cycles": 17838287559, "detail": "684 UART bytes seen"},
+      {"index": 9, "op": "wait", "label": null, "status": "pass", "at_ms": 71485, "at_cycles": 17863322460, "detail": "waited 100 ms"}
+    ]
+  },
+  "uart": {"bytes": 684, "sha256": "aec2a63ac9a18865ef50c597f991bd9dc01ac2d56cc5ce381ed418f3a0e43866"}
+}

@@ -104,6 +104,57 @@ GameOverの長時間UART実行は、LCD画素デコードを省略してPIO TX F
 UART専用の状態遷移検証であり、framebuffer/LCD電気タイミングの合格を意味しない。
 製品BIN自体は同じ`db495f…`で、ゲーム更新・衝突・入力・RP2040タイマーは変更していない。
 
+## 追加の非実機検証（2026-09-10）
+
+製品BIN（SHA-256: `db495f5f2e36a0cd2fa0f4921679a3aac3adcb61861dded8a56eedc91ca467c6`）を
+使い、厳密ガード、再出撃、入力境界、SD有無、描画、代表負荷を追加確認した。
+全レポート・UARTログ・シナリオ・必要な画面キャプチャは
+[`2026-09-10-nonhardware`](../../../build-artifacts/2026-09-10-nonhardware/) に保存している。
+
+### 厳密UARTガードと入力境界
+
+- [`strict-title-uart`](../../../build-artifacts/2026-09-10-nonhardware/strict-title-uart/):
+  Title→Demoを`time_us=30584627`、Demo→Titleを`60648619`で検出した。差分は
+  `30063992 µs`で、シナリオの33秒観測窓内に合格した。
+- [`strict-gameover-uart`](../../../build-artifacts/2026-09-10-nonhardware/strict-gameover-uart/):
+  Down＋Oの通常墜落でGameOverを`71157851 µs`、Title帰還を`81159000 µs`で検出した。
+  差分は`10001149 µs`である。
+- [`direct-retry-uart`](../../../build-artifacts/2026-09-10-nonhardware/direct-retry-uart/):
+  GameOverでEnterを押し、`MODE GameOver->Play`とWave初期化を確認した。
+- [`weapon-edges-uart`](../../../build-artifacts/2026-09-10-nonhardware/weapon-edges-uart/):
+  ミサイル枠飽和、機銃・スロットル・旋回の同時入力後もシナリオが継続した。
+
+### 描画とSD
+
+公式LCDモデル（backend commit `58e73010636bb1b60fdb1ccace40db29b5bb96cc`）で
+Boot/Play、Pause→Resume、音声操作入力、武器境界を実行し、各シナリオは合格、
+320×320 framebufferの非黒画素は`102400`だった。
+
+- [`boot-play-framebuffer`](../../../build-artifacts/2026-09-10-nonhardware/boot-play-framebuffer/)
+- [`pause-resume-framebuffer`](../../../build-artifacts/2026-09-10-nonhardware/pause-resume-framebuffer/)
+- [`audio-controls-framebuffer`](../../../build-artifacts/2026-09-10-nonhardware/audio-controls-framebuffer/)
+- [`weapon-edges-framebuffer`](../../../build-artifacts/2026-09-10-nonhardware/weapon-edges-framebuffer/)
+
+F5はFAT32 SDモデルで`SCREENSHOT done status=ok`まで完走し、コマンド636、読込163
+ブロック、書込464ブロック、プロトコルエラー0を記録した（
+[`screenshot-sd`](../../../build-artifacts/2026-09-10-nonhardware/screenshot-sd/)）。
+カードなしではdetect=High、`SD init status=no_card`、`SCREENSHOT error stage=mount`
+を確認した（
+[`screenshot-no-sd`](../../../build-artifacts/2026-09-10-nonhardware/screenshot-no-sd/)）。
+SDのカード検出Highは一時的なエミュレーター診断差分で明示しており、製品BINには含まれない。
+
+### 代表上限負荷
+
+[`upper-load-2m`](../../../build-artifacts/2026-09-10-nonhardware/upper-load-2m/) では、
+製品BINでO・右・↑・Spaceを保持した120秒の代表負荷を実行した。約30.27 Gcycles、
+`scenario_done`、例外なし、unsupported MMIOなし、キーボードdrop 0で合格した。
+これは20分連続プレイとフレーム時間p95のリリースゲートを満たすものではない。
+
+長時間UARTとSDの一部はLCD画素デコードを省略した高速PIOシンク
+（[`backend-fast-uart.patch`](../../../build-artifacts/2026-09-10-nonhardware/backend-fast-uart.patch)）
+を使用した。したがって、それらは状態遷移・入力・ファイルI/Oの検証であり、
+LCD framebufferや電気タイミングの合格とは別扱いである。
+
 ## 未確認
 
 実機でのスピーカー音質（拡張フレーズの聴感、パーカッション音量、エンジン音の

@@ -1,0 +1,50 @@
+{
+  "schema_version": 8,
+  "backend_commit": "24bee45f36d9a53cd65cf56522915786c3d95075",
+  "backend_build": {"commit": "24bee45f36d9a53cd65cf56522915786c3d95075", "dirty": false},
+  "firmware": {"basename": "pico_skyace.bin", "sha256": "db495f5f2e36a0cd2fa0f4921679a3aac3adcb61861dded8a56eedc91ca467c6"},
+  "bootrom": {"basename": "bootrom-rp2040-b2.bin", "sha256": "9c19b46f068c21f90d200c514faad4a0d5cecfc978f155b8c9d25cb6bc2efd81", "executed": false},
+  "execution_model": "Serial",
+  "board": "none",
+  "lcd_variant": "pio-rgb565",
+  "boot": {"mode": "direct_boot_from_flash", "vtor_flash_offset": "0x0100"},
+  "step_quantum": 65536,
+  "cycle_limit": 35000000000,
+  "stop_pc": null,
+  "stop_reason": "scenario_done",
+  "cycles": 30265027005,
+  "elapsed_us": 121092117,
+  "pc": "0x1000eb34",
+  "exception": null,
+  "error": null,
+  "verdict": {"status": "pass", "reasons": [], "expected_stop_reason": "scenario_done", "required_uart_markers": [], "missing_uart_markers": []},
+  "unsupported_mmio": [],
+  "unsupported_mmio_truncated": false,
+  "keyboard": {
+    "attached": true, "addr": "0x1f",
+    "reg_selects": 525, "key_events_delivered": 14, "key_events_remaining": 0,
+    "key_events_dropped": 0, "key_events_overwritten": 0,
+    "battery_reads": 0, "backlight_writes": 1, "backlight": 0, "lcd_backlight": 208,
+    "config": "0xd2", "interrupt_status": "0x08", "caps_lock": false, "num_lock": false,
+    "unknown_reg_selects": 0, "unknown_reg_writes": 0, "last_unknown_reg": null
+  },
+  "scenario": {
+    "file": "upper_load_2m_product.json",
+    "name": "pico-skyace-upper-load-2m-product",
+    "description": "Representative two-minute production-binary upper-load run. Hold throttle, pitch, roll, and gun input while the normal Play update, enemy AI, collision, weapons, HUD, and LCD path continue. This is a stability sample, not the release-gate 20-minute run.",
+    "status": "pass",
+    "poll_ms": 10,
+    "steps_total": 7,
+    "error": null,
+    "steps": [
+      {"index": 0, "op": "wait_until", "label": "firmware initialized", "status": "pass", "at_ms": 441, "at_cycles": 102299256, "detail": "302 UART bytes seen"},
+      {"index": 1, "op": "key_events", "label": "start Play", "status": "pass", "at_ms": 491, "at_cycles": 114816767, "detail": "sent 2 raw key event(s)"},
+      {"index": 2, "op": "wait_until", "label": "Play starts", "status": "pass", "at_ms": 491, "at_cycles": 114816767, "detail": "473 UART bytes seen"},
+      {"index": 3, "op": "key_events", "label": "apply sustained upper-load controls", "status": "pass", "at_ms": 841, "at_cycles": 202439291, "detail": "sent 8 raw key event(s)"},
+      {"index": 4, "op": "wait", "label": "run the representative upper-load window", "status": "pass", "at_ms": 120841, "at_cycles": 30202439559, "detail": "waited 120000 ms"},
+      {"index": 5, "op": "key_events", "label": "release sustained controls", "status": "pass", "at_ms": 120991, "at_cycles": 30239992035, "detail": "sent 4 raw key event(s)"},
+      {"index": 6, "op": "wait", "label": null, "status": "pass", "at_ms": 121092, "at_cycles": 30265027005, "detail": "waited 100 ms"}
+    ]
+  },
+  "uart": {"bytes": 473, "sha256": "0dab7bc3bdf27fa2f0220983577870c98b1e89a7b9719f563ddc2c750db5ec28"}
+}

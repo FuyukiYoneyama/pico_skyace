@@ -1,0 +1,51 @@
+{
+  "schema_version": 8,
+  "backend_commit": "5d365c08191aaa3e490c8ac6d491df55e152ba2a",
+  "backend_build": {"commit": "5d365c08191aaa3e490c8ac6d491df55e152ba2a", "dirty": false},
+  "firmware": {"basename": "pico_skyace.bin", "sha256": "db495f5f2e36a0cd2fa0f4921679a3aac3adcb61861dded8a56eedc91ca467c6"},
+  "bootrom": {"basename": "bootrom-rp2040-b2.bin", "sha256": "9c19b46f068c21f90d200c514faad4a0d5cecfc978f155b8c9d25cb6bc2efd81", "executed": false},
+  "execution_model": "Serial",
+  "board": "none",
+  "lcd_variant": "pio-rgb565",
+  "boot": {"mode": "direct_boot_from_flash", "vtor_flash_offset": "0x0100"},
+  "step_quantum": 65536,
+  "cycle_limit": 25000000000,
+  "stop_pc": null,
+  "stop_reason": "scenario_done",
+  "cycles": 20292240645,
+  "elapsed_us": 81200972,
+  "pc": "0x10000dd0",
+  "exception": null,
+  "error": null,
+  "verdict": {"status": "pass", "reasons": [], "expected_stop_reason": "scenario_done", "required_uart_markers": [], "missing_uart_markers": []},
+  "unsupported_mmio": [],
+  "unsupported_mmio_truncated": false,
+  "keyboard": {
+    "attached": true, "addr": "0x1f",
+    "reg_selects": 420, "key_events_delivered": 6, "key_events_remaining": 0,
+    "key_events_dropped": 0, "key_events_overwritten": 0,
+    "battery_reads": 0, "backlight_writes": 1, "backlight": 0, "lcd_backlight": 208,
+    "config": "0xd2", "interrupt_status": "0x08", "caps_lock": false, "num_lock": false,
+    "unknown_reg_selects": 0, "unknown_reg_writes": 0, "last_unknown_reg": null
+  },
+  "scenario": {
+    "file": "gameover_timeout_strict_uart.json",
+    "name": "pico-skyace-gameover-timeout-strict-uart",
+    "description": "Exercise the real collision path and guard the production 10-second GameOver deadline with UART. Down plus maximum throttle only shortens the pre-crash portion; the timeout itself is unmodified.",
+    "status": "pass",
+    "poll_ms": 10,
+    "steps_total": 8,
+    "error": null,
+    "steps": [
+      {"index": 0, "op": "wait_until", "label": "firmware initialized", "status": "pass", "at_ms": 441, "at_cycles": 102299256, "detail": "302 UART bytes seen"},
+      {"index": 1, "op": "key_events", "label": "start Play", "status": "pass", "at_ms": 491, "at_cycles": 114816767, "detail": "sent 2 raw key event(s)"},
+      {"index": 2, "op": "wait", "label": null, "status": "pass", "at_ms": 691, "at_cycles": 164821224, "detail": "waited 200 ms"},
+      {"index": 3, "op": "key_events", "label": "hold throttle and nose down until crash", "status": "pass", "at_ms": 691, "at_cycles": 164821224, "detail": "sent 2 raw key event(s)"},
+      {"index": 4, "op": "wait_until", "label": "play enters game over", "status": "pass", "at_ms": 71194, "at_cycles": 17790511350, "detail": "535 UART bytes seen"},
+      {"index": 5, "op": "wait", "label": null, "status": "pass", "at_ms": 71294, "at_cycles": 17815546361, "detail": "waited 100 ms"},
+      {"index": 6, "op": "key_events", "label": "release crash inputs", "status": "pass", "at_ms": 71294, "at_cycles": 17815546361, "detail": "sent 2 raw key event(s)"},
+      {"index": 7, "op": "wait_until", "label": "game over returns to title within the strict 11 s guard", "status": "pass", "at_ms": 81200, "at_cycles": 20292240645, "detail": "613 UART bytes seen"}
+    ]
+  },
+  "uart": {"bytes": 613, "sha256": "1b4dc00d04caf27b23c0e25ba70534d98e447f6a9bfdffaa2c2362ee6e9d3350"}
+}

@@ -1,0 +1,87 @@
+{
+  "schema_version": 8,
+  "backend_commit": "58e73010636bb1b60fdb1ccace40db29b5bb96cc",
+  "backend_build": {"commit": "58e73010636bb1b60fdb1ccace40db29b5bb96cc", "dirty": false},
+  "firmware": {"basename": "pico_skyace.bin", "sha256": "db495f5f2e36a0cd2fa0f4921679a3aac3adcb61861dded8a56eedc91ca467c6"},
+  "bootrom": {"basename": "bootrom-rp2040-b2.bin", "sha256": "9c19b46f068c21f90d200c514faad4a0d5cecfc978f155b8c9d25cb6bc2efd81", "executed": false},
+  "execution_model": "Serial",
+  "board": "picocalc",
+  "lcd_variant": "pio-rgb565",
+  "boot": {"mode": "direct_boot_from_flash", "vtor_flash_offset": "0x0100"},
+  "step_quantum": 768,
+  "cycle_limit": 2000000000,
+  "stop_pc": null,
+  "stop_reason": "scenario_done",
+  "cycles": 467660385,
+  "elapsed_us": 1885217,
+  "pc": "0x1000eb3a",
+  "exception": null,
+  "error": null,
+  "verdict": {"status": "pass", "reasons": [], "expected_stop_reason": "scenario_done", "required_uart_markers": [], "missing_uart_markers": []},
+  "unsupported_mmio": [],
+  "unsupported_mmio_truncated": false,
+  "lcd": {
+    "reset_pulses": 2,
+    "init": {"swreset": 0, "slpout": 1, "slpin": 0, "dispon": 1, "dispoff": 0},
+    "state": {"sleeping": false, "display_on": true, "inverted": true},
+    "madctl": "0x48",
+    "colmod": "0x65",
+    "caset": 53, "raset": 53, "ramwr": 53, "ramrd": 0,
+    "pixels_written": 1433600, "pixels_dropped": 0, "orphan_data_bytes": 0,
+    "unknown_commands": [
+      {"code": "0x35", "count": 1},
+      {"code": "0xb1", "count": 1},
+      {"code": "0xb4", "count": 1},
+      {"code": "0xb7", "count": 1},
+      {"code": "0xb9", "count": 1},
+      {"code": "0xc0", "count": 1},
+      {"code": "0xc1", "count": 1},
+      {"code": "0xc2", "count": 1},
+      {"code": "0xc5", "count": 1},
+      {"code": "0xe0", "count": 1},
+      {"code": "0xe1", "count": 1},
+      {"code": "0xe8", "count": 1},
+      {"code": "0xf0", "count": 4}
+    ]
+  },
+  "framebuffer": {"width": 320, "height": 320, "rgb565_sha256": "ea355705e23ce4381b61aa302f67d7b2f4e71ced4ce9494fcdcff0f13b0eaa15", "non_black_pixels": 102400, "png": null},
+  "keyboard": {
+    "attached": true, "addr": "0x1f",
+    "reg_selects": 47, "key_events_delivered": 16, "key_events_remaining": 0,
+    "key_events_dropped": 0, "key_events_overwritten": 0,
+    "battery_reads": 0, "backlight_writes": 1, "backlight": 0, "lcd_backlight": 208,
+    "config": "0xd2", "interrupt_status": "0x08", "caps_lock": false, "num_lock": false,
+    "unknown_reg_selects": 0, "unknown_reg_writes": 0, "last_unknown_reg": null
+  },
+  "pwm": {
+    "inte": "0x00",
+    "configured_slices": [
+      {"slice": 5, "csr": "0x00000001", "top": 1023, "cc": "0x02310231"}
+    ]
+  },
+  "pio": [
+    {"block": 0, "fstat": "0x0f000f00", "sm_enabled": [true, false, false, false], "sm_pc": [30, 0, 0, 0]}
+  ],
+  "scenario": {
+    "file": "audio_controls_smoke.json",
+    "name": "pico-skyace-audio-controls-smoke",
+    "description": "Exercise throttle, roll, and pitch controls while the engine is running.",
+    "status": "pass",
+    "poll_ms": 5,
+    "steps_total": 10,
+    "error": null,
+    "steps": [
+      {"index": 0, "op": "wait_until", "label": "firmware initialized", "status": "pass", "at_ms": 485, "at_cycles": 117654109, "detail": "353 UART bytes seen"},
+      {"index": 1, "op": "key_events", "label": "start Play", "status": "pass", "at_ms": 535, "at_cycles": 130154767, "detail": "sent 2 raw key event(s)"},
+      {"index": 2, "op": "wait", "label": null, "status": "pass", "at_ms": 785, "at_cycles": 192655416, "detail": "waited 250 ms"},
+      {"index": 3, "op": "key_events", "label": "accelerate", "status": "pass", "at_ms": 985, "at_cycles": 242657154, "detail": "sent 5 raw key event(s)"},
+      {"index": 4, "op": "wait", "label": null, "status": "pass", "at_ms": 1135, "at_cycles": 280157460, "detail": "waited 150 ms"},
+      {"index": 5, "op": "key_events", "label": "bank right", "status": "pass", "at_ms": 1335, "at_cycles": 330158719, "detail": "sent 5 raw key event(s)"},
+      {"index": 6, "op": "wait", "label": null, "status": "pass", "at_ms": 1485, "at_cycles": 367658811, "detail": "waited 150 ms"},
+      {"index": 7, "op": "key_events", "label": "pitch up", "status": "pass", "at_ms": 1635, "at_cycles": 405160278, "detail": "sent 4 raw key event(s)"},
+      {"index": 8, "op": "wait", "label": null, "status": "pass", "at_ms": 1885, "at_cycles": 467660385, "detail": "waited 250 ms"},
+      {"index": 9, "op": "assert", "label": "controlled frame remains rendered", "status": "pass", "at_ms": 1885, "at_cycles": 467660385, "detail": "102400 non-black pixels in (0,0) 320x320 (want 1..)"}
+    ]
+  },
+  "uart": {"bytes": 473, "sha256": "720f3642f24318fe57eb27d21ea49f0ca5da97d5427016e07e7af266d499a39b"}
+}

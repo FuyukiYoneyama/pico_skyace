@@ -1,0 +1,20 @@
+diff --git a/crates/picocalc-harness/src/main.rs b/crates/picocalc-harness/src/main.rs
+index 11f7094..9af35fb 100644
+--- a/crates/picocalc-harness/src/main.rs
++++ b/crates/picocalc-harness/src/main.rs
+@@ -2288,6 +2288,15 @@ fn boot(
+         // harness polarity shortcut.
+         emu.bus.external_gpio_in_override &= !detect;
+         emu.bus.gpio_in &= !detect;
++    } else {
++        // The physical slot pull-up leaves card-detect high when no card is
++        // inserted. Keep that electrical state explicit in the harness;
++        // otherwise an unattached SPI0 defaults low and the firmware waits
++        // for a card that is not present.
++        let detect = 1u32 << pins::SD_PIN_DETECT;
++        emu.bus.external_gpio_in_mask |= detect;
++        emu.bus.external_gpio_in_override |= detect;
++        emu.bus.gpio_in |= detect;
+     }
+ 
+     if boot_request == BootRequest::Boot2 {

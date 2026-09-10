@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "name": "pico-skyace-gameover-direct-retry-product",
+  "description": "Run the real collision path, then use Enter on GameOver to retry directly without waiting for the 10-second title return.",
+  "poll_ms": 10,
+  "steps": [
+    {
+      "op": "wait_until",
+      "label": "firmware initialized",
+      "condition": {"kind": "uart_contains", "text": "DISPLAY init ok (verified lcd_rgb565_pio driver, blocking mode)"},
+      "timeout_ms": 10000
+    },
+    {
+      "op": "key_events",
+      "label": "start Play",
+      "gap_ms": 50,
+      "events": [
+        {"state": "pressed", "code": 10},
+        {"state": "released", "code": 10}
+      ]
+    },
+    {"op": "wait", "ms": 200},
+    {
+      "op": "key_events",
+      "label": "hold throttle and nose down until crash",
+      "events": [
+        {"state": "pressed", "code": 182},
+        {"state": "pressed", "code": 79}
+      ]
+    },
+    {
+      "op": "wait_until",
+      "label": "play enters game over",
+      "condition": {"kind": "uart_contains", "text": "MODE Play->GameOver"},
+      "timeout_ms": 100000
+    },
+    {"op": "wait", "ms": 100},
+    {
+      "op": "key_events",
+      "label": "release crash inputs",
+      "events": [
+        {"state": "released", "code": 182},
+        {"state": "released", "code": 79}
+      ]
+    },
+    {
+      "op": "key_events",
+      "label": "retry directly from game over",
+      "gap_ms": 50,
+      "events": [
+        {"state": "pressed", "code": 10},
+        {"state": "released", "code": 10}
+      ]
+    },
+    {
+      "op": "wait_until",
+      "label": "direct retry enters Play",
+      "condition": {"kind": "uart_contains", "text": "MODE GameOver->Play"},
+      "timeout_ms": 1000
+    },
+    {"op": "wait", "ms": 100}
+  ]
+}
