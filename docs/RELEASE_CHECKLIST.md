@@ -67,11 +67,15 @@ supported target until separately tested.
       test above after the deferred 1.0.0 final build; the current v0.9.3
       report does not identify the not-yet-built final UF2 and predates the
       unreleased Wave aggression tuning.
-- [ ] Record a 20-minute upper-load play run and frame-time/memory evidence;
-      the plan's provisional target is a 33 ms 95th-percentile frame. A
-      separate two-minute production-BIN stability sample and a non-hardware
-      diagnostic p95/stack sample are archived, but neither satisfies the
-      20-minute gate or proves the real LCD-transfer frame time.
+- [x] User-reported 20-minute upper-load play run completed without issue on
+      2026-09-10. This is a manual stability-acceptance record; the tested
+      UF2 hash, UART log, and exact run metadata were not supplied.
+- [ ] Record frame-time and memory evidence on the target hardware; the plan's
+      provisional target is a 33 ms 95th-percentile frame, with runtime stack
+      headroom recorded alongside Flash/RAM usage. The separate two-minute
+      production-BIN stability sample and non-hardware diagnostic p95/stack
+      sample do not prove the real LCD-transfer frame time. Repeat this gate
+      after the deferred 1.0.0 final build.
 - [x] Existing title/gameplay images are explicitly labeled as historical; a
       final-firmware capture can replace them for the v1.0.0 release page.
 - [ ] Create the `v1.0.0` Git tag and GitHub Release, attaching the UF2 and its
