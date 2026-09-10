@@ -13,6 +13,8 @@ claimed until the production build and the target-hardware gate are complete.
 - Increased enemy pressure by Wave: later enemies pursue sooner, turn faster,
   move faster, and fire from a wider/longer solution with shorter cooldowns.
   The attack warning remains in place so the stronger attack is still readable.
+- Added explicit incoming-attack direction cues: `FROM ...` text plus a red
+  direction arrow around the reticle, including rear and diagonal directions.
 
 ## [0.9.3] - 2026-09-10
 

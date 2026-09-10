@@ -1829,9 +1829,13 @@ bool projection_screen_point(const Proj& p, int* sx, int* sy) {
 bool edge_arrow_for_projection(const Proj& p, int* dir_x, int* dir_y,
                                int* arrow_x, int* arrow_y) {
     if (p.zc <= 0) {
-        // 背後の目標は、旋回方向を迷わせないため右旋回を固定で案内する。
-        *dir_x = 1;
-        *dir_y = p.yc >= 0 ? 1 : -1;
+        // 背後の目標もカメラ空間の左右・上下を使って案内する。真後ろは
+        // 画面下中央を専用の手掛かりにする。
+        *dir_x = static_cast<int>(p.xc / kQ8);
+        *dir_y = -static_cast<int>(p.yc / kQ8);
+        if (*dir_x == 0 && *dir_y == 0) {
+            *dir_y = 1;
+        }
     } else {
         int sx;
         int sy;
@@ -1863,6 +1867,102 @@ bool edge_arrow_for_projection(const Proj& p, int* dir_x, int* dir_y,
     *arrow_x = clamp_screen_edge(ax);
     *arrow_y = clamp_screen_edge(ay);
     return true;
+}
+
+struct ThreatDirection {
+    int dx;
+    int dy;
+    bool rear;
+};
+
+void draw_guidance_arrow(int x, int y, int dx, int dy, uint16_t color);
+
+ThreatDirection threat_direction_for_projection(const Proj& p) {
+    ThreatDirection direction{0, 0, p.zc <= 0};
+    if (direction.rear) {
+        // 背後は投影できないため、投影前のカメラ空間ベクトルを使う。
+        const int raw_x = static_cast<int>(p.xc / kQ8);
+        const int raw_y = -static_cast<int>(p.yc / kQ8);
+        direction.dx = static_cast<int>(
+            (static_cast<int64_t>(raw_x) * g_cosr -
+             static_cast<int64_t>(raw_y) * g_sinr) >> 12);
+        direction.dy = static_cast<int>(
+            (static_cast<int64_t>(raw_x) * g_sinr +
+             static_cast<int64_t>(raw_y) * g_cosr) >> 12);
+        return direction;
+    }
+
+    int sx;
+    int sy;
+    if (projection_screen_point(p, &sx, &sy)) {
+        // 照準ではなく視野の中心を基準にする。reticleは少し上に
+        // オフセットしているため、正面の攻撃を「下」と表示しない。
+        direction.dx = sx - kCx;
+        direction.dy = sy - kCy;
+    }
+    if (direction.dx == 0 && direction.dy == 0) {
+        // 量子化で中心に重なった場合も、カメラ空間の微小な差を残す。
+        const int raw_x = static_cast<int>(p.xc / kQ8);
+        const int raw_y = -static_cast<int>(p.yc / kQ8);
+        direction.dx = static_cast<int>(
+            (static_cast<int64_t>(raw_x) * g_cosr -
+             static_cast<int64_t>(raw_y) * g_sinr) >> 12);
+        direction.dy = static_cast<int>(
+            (static_cast<int64_t>(raw_x) * g_sinr +
+             static_cast<int64_t>(raw_y) * g_cosr) >> 12);
+    }
+    return direction;
+}
+
+const char* threat_direction_text(const ThreatDirection& direction) {
+    const int adx = direction.dx >= 0 ? direction.dx : -direction.dx;
+    const int ady = direction.dy >= 0 ? direction.dy : -direction.dy;
+    constexpr int kCenterTolerance = 9;
+    if (adx < kCenterTolerance && ady < kCenterTolerance) {
+        return direction.rear ? "FROM REAR" : "FROM FRONT";
+    }
+
+    if (adx * 2 < ady) {
+        if (direction.rear) {
+            return direction.dy < 0 ? "FROM REAR ABOVE" : "FROM REAR BELOW";
+        }
+        return direction.dy < 0 ? "FROM ABOVE" : "FROM BELOW";
+    }
+    if (ady * 2 < adx) {
+        if (direction.rear) {
+            return direction.dx < 0 ? "FROM REAR LEFT" : "FROM REAR RIGHT";
+        }
+        return direction.dx < 0 ? "FROM LEFT" : "FROM RIGHT";
+    }
+
+    if (direction.rear) {
+        if (direction.dx < 0) {
+            return direction.dy < 0 ? "FROM REAR UP-LEFT" :
+                                      "FROM REAR DOWN-LEFT";
+        }
+        return direction.dy < 0 ? "FROM REAR UP-RIGHT" :
+                                  "FROM REAR DOWN-RIGHT";
+    }
+    if (direction.dx < 0) {
+        return direction.dy < 0 ? "FROM UP-LEFT" : "FROM DOWN-LEFT";
+    }
+    return direction.dy < 0 ? "FROM UP-RIGHT" : "FROM DOWN-RIGHT";
+}
+
+void draw_attack_direction_indicator(const ThreatDirection& direction,
+                                     uint16_t color) {
+    const int adx = direction.dx >= 0 ? direction.dx : -direction.dx;
+    const int ady = direction.dy >= 0 ? direction.dy : -direction.dy;
+    const int span = adx > ady ? adx : ady;
+    if (span == 0) {
+        // 正面／真後ろは文字表示（FROM FRONT/REAR）で明示する。
+        return;
+    }
+
+    constexpr int kDirectionRadius = 27;
+    const int arrow_x = kCx + direction.dx * kDirectionRadius / span;
+    const int arrow_y = kCy + direction.dy * kDirectionRadius / span;
+    draw_guidance_arrow(arrow_x, arrow_y, direction.dx, direction.dy, color);
 }
 
 void draw_guidance_arrow(int x, int y, int dx, int dy, uint16_t color) {
@@ -1945,6 +2045,11 @@ void render_attack_warning() {
     }
 
     const Enemy& attacker = g_en[warning_target];
+    const Proj p = project(attacker.x, attacker.y, attacker.z);
+    const ThreatDirection direction = threat_direction_for_projection(p);
+    const char* const direction_text = threat_direction_text(direction);
+    gfx::text(kCx - gfx::text_width(direction_text) / 2, 18, direction_text,
+              kColRed);
     gfx::text(kCx - gfx::text_width("INCOMING") / 2, 28, "INCOMING", kColRed);
     constexpr int kWarningBarW = 30;
     const int bar_x = kCx - kWarningBarW / 2;
@@ -1955,7 +2060,9 @@ void render_attack_warning() {
         gfx::fill_rect(bar_x + 1, 38, fill_w, 2, kColRed);
     }
 
-    const Proj p = project(attacker.x, attacker.y, attacker.z);
+    // 照準周囲の矢印は、敵が画面内にいて赤枠が点滅している間も表示する。
+    draw_attack_direction_indicator(direction, kColRed);
+
     int sx;
     int sy;
     if (projection_screen_point(p, &sx, &sy) &&
