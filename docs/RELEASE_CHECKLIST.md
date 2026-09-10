@@ -20,6 +20,11 @@ supported target until separately tested.
 - [x] BGM provenance and distribution record (`docs/BGM_PROVENANCE.md`).
 - [x] Build and operation instructions in `README.md`.
 - [x] Host logic test target; current result: 1/1 test passed.
+- [x] Product ELF Flash/RAM size and a non-hardware diagnostic stack high-water
+      sample are recorded under
+      [`build-artifacts/2026-09-10-nonhardware/perf-diagnostic/`](../build-artifacts/2026-09-10-nonhardware/perf-diagnostic/).
+      The diagnostic frame-time value is explicitly not used as the real-device
+      33 ms performance verdict.
 - [x] RP2040 Release UF2 build; current artifact is in `build/`.
 - [x] Emulator smoke evidence for boot/title/play/pause/audio and a shortened
       real-play demo path; see `docs/validation/2026-09-10-demo/BUILD.md`.
