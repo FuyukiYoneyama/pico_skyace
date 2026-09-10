@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "name": "pico-skyace-title-demo-cycle-uart-smoke",
+  "description": "Verify production title/demo timeout markers without shortening firmware timing.",
+  "poll_ms": 10,
+  "steps": [
+    {
+      "op": "wait_until",
+      "label": "firmware initialized",
+      "condition": {"kind": "uart_contains", "text": "DISPLAY init ok (verified lcd_rgb565_pio driver, blocking mode)"},
+      "timeout_ms": 3000
+    },
+    {
+      "op": "wait_until",
+      "label": "title enters demo after 30 seconds",
+      "condition": {"kind": "uart_contains", "text": "MODE Title->Demo"},
+      "timeout_ms": 33000
+    },
+    {
+      "op": "wait_until",
+      "label": "demo returns to title after 30 seconds",
+      "condition": {"kind": "uart_contains", "text": "MODE Demo->Title(timeout)"},
+      "timeout_ms": 33000
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "name": "pico-skyace-title-demo-cycle-product",
+  "description": "Run the unmodified production-timing title/demo/title path. The generous observation windows cover LCD-transfer cost in the cycle-accurate board model; firmware deadlines remain 30 s and 30 s.",
+  "poll_ms": 10,
+  "steps": [
+    {
+      "op": "wait_until",
+      "label": "firmware initialized",
+      "condition": {"kind": "uart_contains", "text": "DISPLAY init ok (verified lcd_rgb565_pio driver, blocking mode)"},
+      "timeout_ms": 10000
+    },
+    {
+      "op": "wait_until",
+      "label": "title enters demo (30 s firmware deadline)",
+      "condition": {"kind": "uart_contains", "text": "MODE Title->Demo"},
+      "timeout_ms": 100000
+    },
+    {
+      "op": "wait_until",
+      "label": "demo returns to title (30 s firmware deadline)",
+      "condition": {"kind": "uart_contains", "text": "MODE Demo->Title(timeout)"},
+      "timeout_ms": 100000
+    }
+  ]
+}

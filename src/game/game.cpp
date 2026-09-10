@@ -38,15 +38,12 @@ constexpr int kFrameMs = 33;         // 約 30fps
 constexpr uint32_t kGameOverAutoReturnMs = 10000;
 constexpr uint32_t kTitleDemoDelayMs = PICO_SKYACE_TITLE_DEMO_DELAY_MS;
 constexpr uint32_t kDemoDurationMs = 30000;
-constexpr uint32_t kGameOverAutoReturnFrames =
-    (kGameOverAutoReturnMs + static_cast<uint32_t>(kFrameMs) - 1u) /
-    static_cast<uint32_t>(kFrameMs);
-constexpr uint32_t kTitleDemoDelayFrames =
-    (kTitleDemoDelayMs + static_cast<uint32_t>(kFrameMs) - 1u) /
-    static_cast<uint32_t>(kFrameMs);
-constexpr uint32_t kDemoDurationFrames =
-    (kDemoDurationMs + static_cast<uint32_t>(kFrameMs) - 1u) /
-    static_cast<uint32_t>(kFrameMs);
+constexpr uint64_t kGameOverAutoReturnUs =
+    static_cast<uint64_t>(kGameOverAutoReturnMs) * 1000u;
+constexpr uint64_t kTitleDemoDelayUs =
+    static_cast<uint64_t>(kTitleDemoDelayMs) * 1000u;
+constexpr uint64_t kDemoDurationUs =
+    static_cast<uint64_t>(kDemoDurationMs) * 1000u;
 constexpr int kFocal = 110;          // 内部解像度での焦点距離（px）
 constexpr int kCx = 80;              // 画面中心
 constexpr int kCy = 80;
@@ -210,9 +207,7 @@ Explosion g_ex[kMaxExplosions];
 
 uint32_t g_frame = 0;
 uint32_t g_play_tick = 0;
-uint32_t g_title_timer = 0;
 uint32_t g_demo_timer = 0;
-uint32_t g_gameover_timer = 0;
 uint32_t g_enemy_generation = 0;
 int g_demo_attack_cooldown = 0;
 int g_wave = 0;
@@ -224,6 +219,12 @@ char g_msg[24] = "";
 bool g_crashed = false;
 DeathReason g_death_reason = DeathReason::None;
 RunResult g_result{};
+
+// モード遷移はフレーム数ではなくRP2040の仮想時刻で判定する。描画やLCD
+// 転送が一時的に遅くなっても、製品仕様の30秒／10秒からずれないようにする。
+uint64_t g_title_deadline_us = 0;
+uint64_t g_demo_deadline_us = 0;
+uint64_t g_gameover_deadline_us = 0;
 
 // 描画用（フレーム毎に計算）
 int g_hy = 80;            // 地平線の中心 y
@@ -669,13 +670,15 @@ void enter_play_from_reset(const char* transition) {
     g_demo_mode = false;
     reset_game();
     g_mode = Mode::Play;
-    g_title_timer = 0;
     g_demo_timer = 0;
-    g_gameover_timer = 0;
+    g_title_deadline_us = 0;
+    g_demo_deadline_us = 0;
+    g_gameover_deadline_us = 0;
     audio::music_stop();
     audio::set_engine(0);
-    std::printf("MODE %s frame=%lu\r\n", transition,
-                static_cast<unsigned long>(g_frame));
+    std::printf("MODE %s frame=%lu time_us=%lu\r\n", transition,
+                static_cast<unsigned long>(g_frame),
+                static_cast<unsigned long>(time_us_64()));
     // 初期速度90m/sに対応したエンジン音を、最初の更新前から開始する。
     set_engine_for_controls();
     g_in.block_held();
@@ -694,7 +697,7 @@ void enter_pause() {
 
 void resume_play() {
     g_mode = Mode::Play;
-    g_gameover_timer = 0;
+    g_gameover_deadline_us = 0;
     g_in.block_held();
     set_engine_for_controls();
     std::printf("MODE Pause->Play frame=%lu\r\n",
@@ -708,28 +711,32 @@ void enter_demo() {
     fm::seed_rng(0xd3e0a11u);
     reset_game();
     g_mode = Mode::Demo;
-    g_title_timer = 0;
     g_demo_timer = 0;
-    g_gameover_timer = 0;
+    g_title_deadline_us = 0;
+    g_demo_deadline_us = time_us_64() + kDemoDurationUs;
+    g_gameover_deadline_us = 0;
     g_demo_attack_cooldown = 0;
     // デモ用の自動操縦更新へ切り替える。タイトルから再生中の曲はそのまま
     // 継続し、攻撃の効果音だけを抑制する。
     audio::set_engine(0);
     g_in.block_held();
-    std::printf("MODE Title->Demo frame=%lu\r\n",
-                static_cast<unsigned long>(g_frame));
+    std::printf("MODE Title->Demo frame=%lu time_us=%lu\r\n",
+                static_cast<unsigned long>(g_frame),
+                static_cast<unsigned long>(time_us_64()));
 }
 
 void enter_title(const char* transition) {
     g_demo_mode = false;
     g_mode = Mode::Title;
-    g_title_timer = 0;
     g_demo_timer = 0;
-    g_gameover_timer = 0;
+    g_title_deadline_us = time_us_64() + kTitleDemoDelayUs;
+    g_demo_deadline_us = 0;
+    g_gameover_deadline_us = 0;
     audio::set_engine(0);
     g_in.block_held();
-    std::printf("MODE %s frame=%lu\r\n", transition,
-                static_cast<unsigned long>(g_frame));
+    std::printf("MODE %s frame=%lu time_us=%lu\r\n", transition,
+                static_cast<unsigned long>(g_frame),
+                static_cast<unsigned long>(time_us_64()));
     play_title_music();
 }
 
@@ -760,14 +767,17 @@ void finalize_gameover() {
     g_demo_mode = false;
     g_result = {g_score, g_wave, g_kills, g_play_tick, g_death_reason};
     g_mode = Mode::GameOver;
-    g_gameover_timer = kGameOverAutoReturnFrames;
+    g_title_deadline_us = 0;
+    g_demo_deadline_us = 0;
+    g_gameover_deadline_us = time_us_64() + kGameOverAutoReturnUs;
     g_msg_timer = 0;
     g_banner_timer = 0;
     for (auto& e : g_en) {
         e.warning_timer = 0;
     }
-    std::printf("MODE Play->GameOver frame=%lu wave=%d score=%d ticks=%lu reason=%d\r\n",
-                static_cast<unsigned long>(g_frame), g_wave, g_score,
+    std::printf("MODE Play->GameOver frame=%lu time_us=%lu wave=%d score=%d ticks=%lu reason=%d\r\n",
+                static_cast<unsigned long>(g_frame),
+                static_cast<unsigned long>(time_us_64()), g_wave, g_score,
                 static_cast<unsigned long>(g_play_tick),
                 static_cast<int>(g_death_reason));
     audio::set_engine(0);
@@ -1314,6 +1324,7 @@ void update_explosions() {
 
 void update_play() {
     ++g_play_tick;
+
 
     update_player_motion();
     if (g_death_reason != DeathReason::None) {
@@ -2250,6 +2261,9 @@ void run() {
     init_mirrored_art();
     g_pl.y = 600 * kQ8;
     play_title_music();
+    g_title_deadline_us = time_us_64() + kTitleDemoDelayUs;
+    g_demo_deadline_us = 0;
+    g_gameover_deadline_us = 0;
 
     absolute_time_t next_frame = make_timeout_time_ms(kFrameMs);
     while (true) {
@@ -2272,12 +2286,21 @@ void run() {
                 if (g_in.pressed[keys::Enter]) {
                     enter_play_from_reset("Title->Play");
                     render_play();
-                } else if (++g_title_timer >= kTitleDemoDelayFrames) {
+                } else if (g_title_deadline_us != 0 &&
+                           time_us_64() >= g_title_deadline_us) {
                     enter_demo();
                     update_demo();
                     render_demo();
                 } else {
                     render_title();
+                    // LCD転送が締切をまたいでも、次のフレームを丸ごと待たずに
+                    // このフレームの完了時点でデモへ切り替える。
+                    if (g_title_deadline_us != 0 &&
+                        time_us_64() >= g_title_deadline_us) {
+                        enter_demo();
+                        update_demo();
+                        render_demo();
+                    }
                 }
                 break;
             case Mode::Play:
@@ -2311,12 +2334,21 @@ void run() {
                 } else if (g_in.pressed[keys::Escape]) {
                     enter_title("Demo->Title(esc)");
                     render_title();
-                } else if (++g_demo_timer >= kDemoDurationFrames) {
+                } else if (g_demo_deadline_us != 0 &&
+                           time_us_64() >= g_demo_deadline_us) {
                     enter_title("Demo->Title(timeout)");
                     render_title();
                 } else {
+                    ++g_demo_timer;
                     update_demo();
                     render_demo();
+                    // 実フレームの描画／転送中に締切を越えた場合も、次の
+                    // フレームまで余計に待たず、直ちにタイトルへ戻す。
+                    if (g_demo_deadline_us != 0 &&
+                        time_us_64() >= g_demo_deadline_us) {
+                        enter_title("Demo->Title(timeout)");
+                        render_title();
+                    }
                 }
                 break;
             case Mode::GameOver:
@@ -2327,12 +2359,17 @@ void run() {
                 } else if (g_in.pressed[keys::Escape]) {
                     enter_title("GameOver->Title(esc)");
                     render_title();
-                } else if (g_gameover_timer > 0 &&
-                           --g_gameover_timer == 0) {
+                } else if (g_gameover_deadline_us != 0 &&
+                           time_us_64() >= g_gameover_deadline_us) {
                     enter_title("GameOver->Title(timeout)");
                     render_title();
                 } else {
                     render_gameover();
+                    if (g_gameover_deadline_us != 0 &&
+                        time_us_64() >= g_gameover_deadline_us) {
+                        enter_title("GameOver->Title(timeout)");
+                        render_title();
+                    }
                 }
                 break;
         }

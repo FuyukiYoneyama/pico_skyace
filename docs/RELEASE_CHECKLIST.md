@@ -31,12 +31,19 @@ supported target until separately tested.
 - [ ] Change `VERSION` and all versioned release text to `1.0.0`.
 - [ ] Rebuild from the final tagged source with the documented SDK/toolchain,
       record size information and the UF2 SHA-256.
-- [ ] Run the production binary (without shortened demo timing) through
-      `title_demo_cycle_smoke.json`, `gameover_timeout_smoke.json`, direct
-      retry, pause/resume, and the weapon/target edge cases; archive the reports.
-      The complete title/demo scenario needs an explicit runner budget (the
-      default `1,000,000,000` cycles stops before 30 seconds of firmware time),
-      for example `--cycles 20000000000`.
+- [x] Run the production binary (without shortened demo timing) through the
+      complete title/demo/title and game-over/title UART scenarios; archived
+      reports are in
+      [`docs/validation/2026-09-10-demo/BUILD.md`](validation/2026-09-10-demo/BUILD.md).
+      The title/demo run includes the official LCD model. The game-over run is
+      UART-only and uses a documented fast PIO sink because the full LCD model
+      makes the deliberate 349-frame crash path impractical; its report is not
+      a framebuffer/electrical-timing pass.
+- [ ] Run the strict 33-second UART guards and framebuffer variants, plus
+      direct retry, pause/resume, and the weapon/target edge cases; archive the
+      reports. The complete title/demo scenario needs an explicit runner budget
+      (the default `1,000,000,000` cycles stops before 30 seconds of firmware
+      time), for example `--cycles 20000000000`.
 - [ ] Verify the final UF2 on an actual standard RP2040 PicoCalc: cold boot,
       LCD, keyboard, simultaneous input, BGM/SFX/engine audio, SD screenshot
       success and no-card recovery, and power-cycle recovery.

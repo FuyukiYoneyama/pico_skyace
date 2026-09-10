@@ -28,6 +28,13 @@
 `build/`に生成し、`build-artifacts/`には検証ログと画面キャプチャだけを残す。
 書き込み前にUF2のSHA-256を照合する。
 
+完全経路検証追記: 2026-09-10。製品BIN（短縮マクロなし）でTitle→Demo→Titleの
+30秒／30秒期限を公式LCDエミュレーターで、Play→GameOver→Titleの10秒期限を
+UART専用高速PIOシンクで完走させ、UARTの`time_us`とrunner reportを保存した。
+実機の音声・表示・電源・SDカード確認と、厳密33秒ガード／framebuffer版はなお
+未完了であり、[ビルド記録](validation/2026-09-10-demo/BUILD.md)と
+[リリースチェックリスト](RELEASE_CHECKLIST.md)の未確認項目を維持する。
+
 ## 1. 目指す体験
 
 **「小さな画面でも敵を追えて、撃墜が気持ちよく、もう一度出撃したくなる空戦ゲーム」**を目指す。

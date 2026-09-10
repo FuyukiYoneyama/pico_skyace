@@ -111,6 +111,12 @@ mkdir -p "$out/snapshots"
 [`v0.9.3 ビルド記録`](docs/validation/2026-09-10-demo/BUILD.md)（以前の記録は
 [`Phase 1ビルド記録`](docs/validation/2026-09-09-phase1/BUILD.md)）を参照してください。
 
+製品設定（`PICO_SKYACE_TITLE_DEMO_DELAY_MS`なし）の完全なTitle→Demo→Titleと
+GameOver→Titleの実行条件・UART時刻・SHA-256付きレポートも、同じ
+[`v0.9.3 ビルド記録`](docs/validation/2026-09-10-demo/BUILD.md)に保存しています。
+GameOverの長時間経路だけは、LCD画素デコードを省略したUART専用高速PIOシンクを
+使うため、表示・電気タイミングの合格とは別扱いです。
+
 BOOTSEL を押しながら USB 接続し、`pico_skyace.uf2` をドラッグ&ドロップで書き込む。
 
 ## LCD ドライバについて（重要）
