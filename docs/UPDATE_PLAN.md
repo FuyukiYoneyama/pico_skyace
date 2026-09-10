@@ -35,11 +35,16 @@ UART専用高速PIOシンクで完走させ、UARTの`time_us`とrunner report�
 音声操作入力、公式LCD framebufferの短時間シナリオも合格し、証跡を
 [`build-artifacts/2026-09-10-nonhardware/`](../build-artifacts/2026-09-10-nonhardware/)へ保存した。
 2分の代表上限負荷も例外・入力dropなしで完走した。ただし、GameOverの公式LCDを含む
-長時間framebuffer版、20分負荷＋フレーム時間計測、実機の音声・表示・電源・SD媒体・
-電源再投入はなお未完了であり、[ビルド記録](validation/2026-09-10-demo/BUILD.md)と
+長時間framebuffer版、20分負荷＋フレーム時間計測はなお未完了であり、[ビルド記録](validation/2026-09-10-demo/BUILD.md)と
 [リリースチェックリスト](RELEASE_CHECKLIST.md)の未確認項目を維持する。
 なお、実機不要の診断BINで300フレームの処理時間p95とスタック高水位を取得したが、
 高速PIOシンク上の仮想値であり、33msの実機合否には採用しない。
+
+実機確認追記: 2026-09-10。ユーザー報告により、現行v0.9.3製品UF2でコールドブート、
+LCD、キーボード、同時入力、BGM（パーカッションを含む）、効果音、エンジン音、
+Title→Demo→Title、GameOver→Title、SDあり／なしのF5、電源再投入が確認済みで、
+SDありの保存成功も確認された。これは現行版の手動スモーク確認であり、1.0.0の最終
+UF2での再確認と、20分上限負荷・実機フレーム時間／メモリ計測は引き続き必要である。
 
 ## 1. 目指す体験
 

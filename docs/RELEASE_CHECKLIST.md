@@ -55,9 +55,17 @@ supported target until separately tested.
 - [x] Exercise the production F5 path with an emulated FAT32 SD card and the
       no-card fallback. The SD model reports zero protocol errors; the no-card
       run explicitly reports detect-high, `no_card`, and mount failure recovery.
+- [x] User-reported hardware smoke test of the current v0.9.3 product UF2:
+      cold boot, LCD output, keyboard input, simultaneous movement/weapon
+      input, BGM (including percussion), SFX, engine sound, Title→Demo→Title,
+      GameOver→Title, SD-present/absent F5 handling, and power-cycle recovery
+      all passed. This is a manual report; the UF2 hash, photos/UART capture,
+      and exact test timestamp were not supplied.
 - [ ] Verify the final UF2 on an actual standard RP2040 PicoCalc: cold boot,
       LCD, keyboard, simultaneous input, BGM/SFX/engine audio, SD screenshot
-      success and no-card recovery, and power-cycle recovery.
+      success and no-card recovery, and power-cycle recovery. Repeat the smoke
+      test above after the deferred 1.0.0 final build; the current v0.9.3
+      report does not identify the not-yet-built final UF2.
 - [ ] Record a 20-minute upper-load play run and frame-time/memory evidence;
       the plan's provisional target is a 33 ms 95th-percentile frame. A
       separate two-minute production-BIN stability sample and a non-hardware
