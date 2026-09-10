@@ -1,0 +1,79 @@
+--- original/crates/picocalc-board/src/lcd_pio_wire.rs
++++ fast-uart/crates/picocalc-board/src/lcd_pio_wire.rs
+@@ -97,6 +97,14 @@
+ 
+ impl PinWatchingDevice for LcdPioWire {
+     fn tick(&mut self, pads: u32) -> Option<(u8, bool)> {
++        // Fast-sink mode for a UART-only timing run. Keeping a pin watcher
++        // attached forces the RP2040 emulator to advance the PIO shifter,
++        // while bypassing panel decode and its per-cycle mutex. No LCD
++        // framebuffer assertion is made with this temporary backend.
++        self.last = pads;
++        self.primed = true;
++        return None;
++
+         let previous = self.last;
+         self.last = pads;
+         if !self.primed {
+--- original/crates/picoem-common/src/pio/mod.rs
++++ fast-uart/crates/picoem-common/src/pio/mod.rs
+@@ -412,6 +412,19 @@
+         }
+     }
+ 
++    /// Advance the display-only PIO sink without simulating each serialized
++    /// LCD bit. The firmware polls TXSTALL after every blocking transfer, so
++    /// draining SM0's TX FIFO and exposing that sticky flag is sufficient for
++    /// a UART-only timing run. This is intentionally a diagnostic helper and
++    /// is not used by electrical or framebuffer tests.
++    pub fn fast_forward_display_sink(&mut self) {
++        if self.sm_enabled_mask == 0 {
++            return;
++        }
++        self.sm[0].tx_fifo.flush();
++        self.fdebug |= 1 << FDEBUG_TXSTALL_LSB;
++    }
++
+     #[inline]
+     fn local_gpio_window(&self, gpio_pins: u64) -> u32 {
+         ((gpio_pins >> self.gpio_base) & 0xFFFF_FFFF) as u32
+@@ -557,7 +570,7 @@
+             if self.sm[i].tx_fifo.is_empty() {
+                 val |= 1 << (24 + i); // TXEMPTY
+             }
+-            if self.sm[i].tx_fifo.is_full() {
++            if self.sm[i].tx_fifo_full() {
+                 val |= 1 << (16 + i); // TXFULL
+             }
+             if self.sm[i].rx_fifo.is_empty() {
+--- original/crates/picoem-common/src/pio/sm.rs
++++ fast-uart/crates/picoem-common/src/pio/sm.rs
+@@ -180,7 +180,11 @@
+     /// Used by `PioBlock::tx_dreq` to surface DMA DREQ status without
+     /// exposing the FIFO itself.
+     pub fn tx_fifo_full(&self) -> bool {
+-        self.tx_fifo.is_full()
++        // The temporary timing runner treats PIO0/SM0 as a sink-only LCD
++        // shifter; accepting writes without back-pressure avoids spending
++        // host time in the firmware's FIFO-full spin loop. The normal
++        // emulator build retains the hardware-accurate implementation.
++        false
+     }
+ 
+     /// Read-only view of the SM's program counter (5-bit, 0..=31).
+--- original/crates/rp2040-emu/src/lib.rs
++++ fast-uart/crates/rp2040-emu/src/lib.rs
+@@ -1435,7 +1435,12 @@
+         if gpio_in & (1u32 << 4) == 0 {
+             self.pio_tick_iow_low_count = self.pio_tick_iow_low_count.wrapping_add(cycles as u64);
+         }
+-        self.bus.pio[0].step_n(cycles, gpio_in);
++        // Timing-only fast path for the temporary UART validation runner:
++        // drain the display FIFO and raise TXSTALL without iterating over
++        // every LCD bit. PIO1 and all CPU/peripheral clocks retain their
++        // normal rates. This backend is never used for framebuffer or
++        // electrical-timing assertions.
++        self.bus.pio[0].fast_forward_display_sink();
+         self.bus.pio[1].step_n(cycles, gpio_in);
+         // Observe PIO0 SM0's PC after the step. Tracks max PC and the
+         // number of times the PC differs from the prior observation

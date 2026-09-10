@@ -1,0 +1,80 @@
+{
+  "schema_version": 8,
+  "backend_commit": "58e73010636bb1b60fdb1ccace40db29b5bb96cc",
+  "backend_build": {"commit": "58e73010636bb1b60fdb1ccace40db29b5bb96cc", "dirty": false},
+  "firmware": {"basename": "pico_skyace.bin", "sha256": "db495f5f2e36a0cd2fa0f4921679a3aac3adcb61861dded8a56eedc91ca467c6"},
+  "bootrom": {"basename": "bootrom-rp2040-b2.bin", "sha256": "9c19b46f068c21f90d200c514faad4a0d5cecfc978f155b8c9d25cb6bc2efd81", "executed": false},
+  "execution_model": "Serial",
+  "board": "picocalc",
+  "lcd_variant": "pio-rgb565",
+  "boot": {"mode": "direct_boot_from_flash", "vtor_flash_offset": "0x0100"},
+  "step_quantum": 65536,
+  "cycle_limit": 50000000000,
+  "stop_pc": null,
+  "stop_reason": "scenario_done",
+  "cycles": 18653235132,
+  "elapsed_us": 74644950,
+  "pc": "0x1000deae",
+  "exception": null,
+  "error": null,
+  "verdict": {"status": "pass", "reasons": [], "expected_stop_reason": "scenario_done", "required_uart_markers": [], "missing_uart_markers": []},
+  "unsupported_mmio": [],
+  "unsupported_mmio_truncated": false,
+  "lcd": {
+    "reset_pulses": 2,
+    "init": {"swreset": 0, "slpout": 1, "slpin": 0, "dispon": 1, "dispoff": 0},
+    "state": {"sleeping": false, "display_on": true, "inverted": true},
+    "madctl": "0x48",
+    "colmod": "0x65",
+    "caset": 41, "raset": 41, "ramwr": 41, "ramrd": 0,
+    "pixels_written": 1126400, "pixels_dropped": 0, "orphan_data_bytes": 0,
+    "unknown_commands": [
+      {"code": "0x35", "count": 1},
+      {"code": "0xb1", "count": 1},
+      {"code": "0xb4", "count": 1},
+      {"code": "0xb7", "count": 1},
+      {"code": "0xb9", "count": 1},
+      {"code": "0xc0", "count": 1},
+      {"code": "0xc1", "count": 1},
+      {"code": "0xc2", "count": 1},
+      {"code": "0xc5", "count": 1},
+      {"code": "0xe0", "count": 1},
+      {"code": "0xe1", "count": 1},
+      {"code": "0xe8", "count": 1},
+      {"code": "0xf0", "count": 4}
+    ]
+  },
+  "framebuffer": {"width": 320, "height": 320, "rgb565_sha256": "cce7606f892320826f2198bce0b9b5e852e432ef251723bd31da854ea34a44e7", "non_black_pixels": 102400, "png": null},
+  "keyboard": {
+    "attached": true, "addr": "0x1f",
+    "reg_selects": 12, "key_events_delivered": 0, "key_events_remaining": 0,
+    "key_events_dropped": 0, "key_events_overwritten": 0,
+    "battery_reads": 0, "backlight_writes": 1, "backlight": 0, "lcd_backlight": 208,
+    "config": "0xd2", "interrupt_status": "0x00", "caps_lock": false, "num_lock": false,
+    "unknown_reg_selects": 0, "unknown_reg_writes": 0, "last_unknown_reg": null
+  },
+  "pwm": {
+    "inte": "0x00",
+    "configured_slices": [
+      {"slice": 5, "csr": "0x00000001", "top": 1023, "cc": "0x02190219"}
+    ]
+  },
+  "pio": [
+    {"block": 0, "fstat": "0x0f000f00", "sm_enabled": [true, false, false, false], "sm_pc": [30, 0, 0, 0]}
+  ],
+  "scenario": {
+    "file": "title_demo_cycle_product.json",
+    "name": "pico-skyace-title-demo-cycle-product",
+    "description": "Run the unmodified production-timing title/demo/title path. The generous observation windows cover LCD-transfer cost in the cycle-accurate board model; firmware deadlines remain 30 s and 30 s.",
+    "status": "pass",
+    "poll_ms": 10,
+    "steps_total": 3,
+    "error": null,
+    "steps": [
+      {"index": 0, "op": "wait_until", "label": "firmware initialized", "status": "pass", "at_ms": 7147, "at_cycles": 1778972562, "detail": "353 UART bytes seen"},
+      {"index": 1, "op": "wait_until", "label": "title enters demo (30 s firmware deadline)", "status": "pass", "at_ms": 40753, "at_cycles": 10180321923, "detail": "475 UART bytes seen"},
+      {"index": 2, "op": "wait_until", "label": "demo returns to title (30 s firmware deadline)", "status": "pass", "at_ms": 74644, "at_cycles": 18653235132, "detail": "528 UART bytes seen"}
+    ]
+  },
+  "uart": {"bytes": 528, "sha256": "cce942defb2677d97478dfe970b9dd22229c6102c6547a4bb30edd13128616fc"}
+}

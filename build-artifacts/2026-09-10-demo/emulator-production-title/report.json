@@ -1,0 +1,81 @@
+{
+  "schema_version": 8,
+  "backend_commit": "58e73010636bb1b60fdb1ccace40db29b5bb96cc",
+  "backend_build": {"commit": "58e73010636bb1b60fdb1ccace40db29b5bb96cc", "dirty": false},
+  "firmware": {"basename": "pico_skyace.bin", "sha256": "db495f5f2e36a0cd2fa0f4921679a3aac3adcb61861dded8a56eedc91ca467c6"},
+  "bootrom": {"basename": "bootrom-rp2040-b2.bin", "sha256": "9c19b46f068c21f90d200c514faad4a0d5cecfc978f155b8c9d25cb6bc2efd81", "executed": false},
+  "execution_model": "Serial",
+  "board": "picocalc",
+  "lcd_variant": "pio-rgb565",
+  "boot": {"mode": "direct_boot_from_flash", "vtor_flash_offset": "0x0100"},
+  "step_quantum": 768,
+  "cycle_limit": 3000000000,
+  "stop_pc": null,
+  "stop_reason": "scenario_done",
+  "cycles": 151397570,
+  "elapsed_us": 620166,
+  "pc": "0x10000da8",
+  "exception": null,
+  "error": null,
+  "verdict": {"status": "pass", "reasons": [], "expected_stop_reason": "scenario_done", "required_uart_markers": [], "missing_uart_markers": []},
+  "unsupported_mmio": [],
+  "unsupported_mmio_truncated": false,
+  "lcd": {
+    "reset_pulses": 2,
+    "init": {"swreset": 0, "slpout": 1, "slpin": 0, "dispon": 1, "dispoff": 0},
+    "state": {"sleeping": false, "display_on": true, "inverted": true},
+    "madctl": "0x48",
+    "colmod": "0x65",
+    "caset": 8, "raset": 8, "ramwr": 8, "ramrd": 0,
+    "pixels_written": 262432, "pixels_dropped": 0, "orphan_data_bytes": 0,
+    "unknown_commands": [
+      {"code": "0x35", "count": 1},
+      {"code": "0xb1", "count": 1},
+      {"code": "0xb4", "count": 1},
+      {"code": "0xb7", "count": 1},
+      {"code": "0xb9", "count": 1},
+      {"code": "0xc0", "count": 1},
+      {"code": "0xc1", "count": 1},
+      {"code": "0xc2", "count": 1},
+      {"code": "0xc5", "count": 1},
+      {"code": "0xe0", "count": 1},
+      {"code": "0xe1", "count": 1},
+      {"code": "0xe8", "count": 1},
+      {"code": "0xf0", "count": 4}
+    ]
+  },
+  "framebuffer": {"width": 320, "height": 320, "rgb565_sha256": "dd4806cf4c529019fe7fb717fe68c0bdadef5c392c4c5af318b771da90e2275e", "non_black_pixels": 102400, "png": null},
+  "keyboard": {
+    "attached": true, "addr": "0x1f",
+    "reg_selects": 3, "key_events_delivered": 0, "key_events_remaining": 0,
+    "key_events_dropped": 0, "key_events_overwritten": 0,
+    "battery_reads": 0, "backlight_writes": 1, "backlight": 0, "lcd_backlight": 208,
+    "config": "0xd2", "interrupt_status": "0x00", "caps_lock": false, "num_lock": false,
+    "unknown_reg_selects": 0, "unknown_reg_writes": 0, "last_unknown_reg": null
+  },
+  "pwm": {
+    "inte": "0x00",
+    "configured_slices": [
+      {"slice": 5, "csr": "0x00000001", "top": 1023, "cc": "0x01910191"}
+    ]
+  },
+  "pio": [
+    {"block": 0, "fstat": "0x0f000f00", "sm_enabled": [true, false, false, false], "sm_pc": [30, 0, 0, 0]}
+  ],
+  "scenario": {
+    "file": "title_version_smoke.json",
+    "name": "pico-skyace-title-version-smoke",
+    "description": "Boot the firmware, keep the title screen visible, and capture the version label.",
+    "status": "pass",
+    "poll_ms": 5,
+    "steps_total": 4,
+    "error": null,
+    "steps": [
+      {"index": 0, "op": "wait_until", "label": "firmware initialized", "status": "pass", "at_ms": 120, "at_cycles": 26396914, "detail": "65 UART bytes seen"},
+      {"index": 1, "op": "wait", "label": null, "status": "pass", "at_ms": 620, "at_cycles": 151397570, "detail": "waited 500 ms"},
+      {"index": 2, "op": "snapshot", "label": null, "status": "pass", "at_ms": 620, "at_cycles": 151397570, "detail": "102400 non-black pixels", "rgb565_sha256": "dd4806cf4c529019fe7fb717fe68c0bdadef5c392c4c5af318b771da90e2275e", "png_basename": "title-version.png"},
+      {"index": 3, "op": "assert", "label": "title frame is rendered", "status": "pass", "at_ms": 620, "at_cycles": 151397570, "detail": "102400 non-black pixels in (0,0) 320x320 (want 1..)"}
+    ]
+  },
+  "uart": {"bytes": 353, "sha256": "06f581051612505aa99eb13defb4270416b051b669c5cad11e63d2314c978c45"}
+}
