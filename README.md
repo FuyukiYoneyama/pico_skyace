@@ -115,7 +115,7 @@ mkdir -p "$out/snapshots"
 GameOver→Titleの実行条件・UART時刻・SHA-256付きレポートも、同じ
 [`v0.9.3 ビルド記録`](docs/validation/2026-09-10-demo/BUILD.md)に保存しています。
 GameOverの長時間経路だけは、LCD画素デコードを省略したUART専用高速PIOシンクを
-使うため、表示・電気タイミングの合格とは別扱いです。
+使うため、公式LCDモデルでの表示・通常PIO転送の合格とは別扱いです。
 
 厳密ガード、直接リトライ、ポーズ復帰、武器入力境界、SDあり／なし、公式LCDの
 framebuffer、代表2分負荷の追加証跡は [`非実機検証記録`](build-artifacts/2026-09-10-nonhardware/)

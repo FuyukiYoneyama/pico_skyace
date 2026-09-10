@@ -38,7 +38,7 @@ supported target until separately tested.
       The title/demo run includes the official LCD model. The game-over run is
       UART-only and uses a documented fast PIO sink because the full LCD model
       makes the deliberate 349-frame crash path impractical; its report is not
-      a framebuffer/electrical-timing pass.
+      a full framebuffer/normal-PIO-transfer-model pass.
 - [x] Run the strict 33-second UART guards and the available framebuffer
       variants, plus direct retry, pause/resume, and weapon/target edge cases;
       reports are archived under

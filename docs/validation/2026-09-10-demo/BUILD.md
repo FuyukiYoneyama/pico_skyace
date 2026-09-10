@@ -101,7 +101,7 @@ dirty=false）で実行し、320×320 framebufferは非黒画素`102400`、LCD�
 GameOverの長時間UART実行は、LCD画素デコードを省略してPIO TX FIFO/TXSTALLだけを
 即時成立させる一時的な高速シンク（backend commit
 `f32eba1878aeabc6dfc8954b363230ef1e4c2b52`, dirty=true）を使用した。これは
-UART専用の状態遷移検証であり、framebuffer/LCD電気タイミングの合格を意味しない。
+UART専用の状態遷移検証であり、公式LCDモデルのframebuffer／通常PIO転送の合格を意味しない。
 製品BIN自体は同じ`db495f…`で、ゲーム更新・衝突・入力・RP2040タイマーは変更していない。
 
 ## 追加の非実機検証（2026-09-10）
@@ -153,7 +153,7 @@ SDのカード検出Highは一時的なエミュレーター診断差分で明�
 長時間UARTとSDの一部はLCD画素デコードを省略した高速PIOシンク
 （[`backend-fast-uart.patch`](../../../build-artifacts/2026-09-10-nonhardware/backend-fast-uart.patch)）
 を使用した。したがって、それらは状態遷移・入力・ファイルI/Oの検証であり、
-LCD framebufferや電気タイミングの合格とは別扱いである。
+公式LCD framebufferや通常PIO転送モデルの合格とは別扱いである。
 
 ## 未確認
 
