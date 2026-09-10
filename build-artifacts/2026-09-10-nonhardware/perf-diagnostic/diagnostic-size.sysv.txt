@@ -1,0 +1,30 @@
+/tmp/pico-skyace-perf-build.My8HeV/pico_skyace.elf  :
+section                  size        addr
+.boot2                    256   268435456
+.text                   71428   268435712
+.rodata                 16056   268507144
+.binary_info               40   268523200
+.ram_vector_table         192   536870912
+.uninitialized_data         0   536871104
+.data                    2688   536871104
+.tdata                      0   536873792
+.tbss                       0   536873792
+.bss                    58976   536873792
+.heap                    2048   536932768
+.scratch_x                  0   537133056
+.scratch_y                  0   537137152
+.stack_dummy             4096   537137152
+.ARM.attributes            40           0
+.comment                   38           0
+.debug_info            326224           0
+.debug_abbrev           43092           0
+.debug_loclists        201583           0
+.debug_aranges           6432           0
+.debug_rnglists         27038           0
+.debug_line            223049           0
+.debug_str              41056           0
+.debug_frame            14872           0
+.debug_line_str           816           0
+Total                 1040020
+
+

@@ -19,6 +19,7 @@
 | SDあり F5 | 合格 | FAT32モデルで `SCREENSHOT done status=ok`。プロトコルエラー0。 |
 | SDなし F5 | 合格 | `gpio22=1 present=0`、`SD init status=no_card`、mountエラー後に復帰。 |
 | 代表上限負荷 | 合格（2分） | 製品BINで120,000 ms、約30.27 Gcycles、例外・unsupported MMIO・入力dropなし。 |
+| 性能・スタック診断 | 計測完了（判定保留） | 診断BINで300フレーム。p95上限264,999 µs、スタック使用944/4096 bytes。高速シンクの仮想値で実機合否には不使用。 |
 
 各ディレクトリには `report.json`、UARTログ、実行シナリオを保存した。画面を伴う
 シナリオにはPNGも保存している。SDありの構造化トレースは
@@ -38,6 +39,8 @@ SDシナリオは同じ高速シンクに、カード未挿入時の物理プル
 明示する診断差分 commit `24bee45f36d9a53cd65cf56522915786c3d95075` を加えた。
 [`backend-empty-sd-detect.patch`](backend-empty-sd-detect.patch) に保存している。
 この差分もエミュレーター側だけのもので、製品BINには含まれない。
+
+性能診断の詳細は [`perf-diagnostic/README.md`](perf-diagnostic/README.md) にまとめた。
 
 ## 残る確認
 

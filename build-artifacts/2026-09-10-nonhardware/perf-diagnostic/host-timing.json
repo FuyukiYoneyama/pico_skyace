@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "artifact_type": "in-process-host-timing",
+  "timing_scope": "picocalc-harness::run_loop",
+  "cpu_clock": "CLOCK_PROCESS_CPUTIME_ID",
+  "firmware": {"basename": "pico_skyace.bin", "sha256": "4c1fe5a50db1015035f98b8b58a8b4c2ce3435decc143987d1c1e3b76ff44397"},
+  "backend_build": {"commit": "24bee45f36d9a53cd65cf56522915786c3d95075", "dirty": false},
+  "board": "none",
+  "step_quantum": 65536,
+  "cycles": 18713733755,
+  "stop_reason": "scenario_done",
+  "emulation_wall_ns": 156757027702,
+  "emulation_cpu_ns": 158952530311,
+  "emulation_cpu_seconds": 158.952530311,
+  "cycles_per_emulation_cpu_second": 117731587.653153270,
+  "cycles_per_emulation_wall_second": 119380508.991120920
+}

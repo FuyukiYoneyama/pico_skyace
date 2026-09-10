@@ -1,0 +1,3 @@
+   text	   data	    bss	    dec	    hex	filename
+  93908	      0	  59164	 153072	  255f0	build/pico_skyace.elf
+  96612	      0	  59168	 155780	  26084	/tmp/pico-skyace-perf-build.My8HeV/pico_skyace.elf

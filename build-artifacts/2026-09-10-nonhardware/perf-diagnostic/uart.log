@@ -1,0 +1,15 @@
+pico_skyace version 0.9.3
+BUILD ID time="Sep 10 2026 20:48:40"
+WATCHDOG_CAUSED_REBOOT=0
+set_sys_clock_khz(250000) ok=1 sysclk=250000 kHz
+LCD NESco-style init sequence sent 0x3A=0x65 RGB565
+DISPLAY init ok (verified lcd_rgb565_pio driver, blocking mode)
+KEYBOARD init ok i2c1 addr=0x1f hz=400000
+BACKLIGHT before=32
+BACKLIGHT set level=220 ok=1
+WAVE START wave=1 enemies=2 frame=0
+SPAWN wave=1 type=0
+SPAWN wave=1 type=0
+MODE Title->Play frame=0 time_us=422304
+PERF frames=300 min_us=183502 avg_us=247292 p95_upper_us=264999 max_us=268438
+STACK bottom=20041000 top=20042000 fill_end=20041e00 first_dirty=20041c50 used_bytes=944 free_bytes=3152

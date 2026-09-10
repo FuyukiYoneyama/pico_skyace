@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "name": "pico-skyace-perf-diagnostic-product",
+  "description": "Diagnostic-only frame-time and stack high-water sample. The firmware is built with PICO_SKYACE_PERF_DIAGNOSTICS and is not the product build.",
+  "poll_ms": 10,
+  "steps": [
+    {
+      "op": "wait_until",
+      "label": "firmware initialized",
+      "condition": {"kind": "uart_contains", "text": "DISPLAY init ok (verified lcd_rgb565_pio driver, blocking mode)"},
+      "timeout_ms": 10000
+    },
+    {
+      "op": "key_events",
+      "label": "start Play",
+      "gap_ms": 50,
+      "events": [
+        {"state": "pressed", "code": 10},
+        {"state": "released", "code": 10}
+      ]
+    },
+    {
+      "op": "wait_until",
+      "label": "Play starts",
+      "condition": {"kind": "uart_contains", "text": "MODE Title->Play"},
+      "timeout_ms": 1000
+    },
+    {
+      "op": "key_events",
+      "label": "apply representative upper-load controls",
+      "gap_ms": 50,
+      "events": [
+        {"state": "pressed", "code": 79},
+        {"state": "pressed", "code": 183},
+        {"state": "pressed", "code": 181},
+        {"state": "pressed", "code": 32},
+        {"state": "held", "code": 79},
+        {"state": "held", "code": 183},
+        {"state": "held", "code": 181},
+        {"state": "held", "code": 32}
+      ]
+    },
+    {
+      "op": "wait_until",
+      "label": "diagnostic frame and stack report",
+      "condition": {"kind": "uart_contains", "text": "PERF frames=300"},
+      "timeout_ms": 180000
+    },
+    {
+      "op": "key_events",
+      "label": "release controls",
+      "gap_ms": 50,
+      "events": [
+        {"state": "released", "code": 79},
+        {"state": "released", "code": 183},
+        {"state": "released", "code": 181},
+        {"state": "released", "code": 32}
+      ]
+    },
+    {"op": "wait", "ms": 100}
+  ]
+}

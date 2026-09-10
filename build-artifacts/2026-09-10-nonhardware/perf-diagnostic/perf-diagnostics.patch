@@ -1,0 +1,151 @@
+--- original/src/game/game.cpp
++++ diagnostic/src/game/game.cpp
+@@ -32,6 +32,118 @@
+ namespace fm = skyace::fixmath;
+ namespace rules = skyace::game_rules;
+ 
++#if defined(PICO_SKYACE_PERF_DIAGNOSTICS)
++// Diagnostic-only frame timing and stack high-water instrumentation. The
++// product build does not define this macro, so it has no product footprint.
++constexpr uint32_t kPerfSampleFrames = 300;   // representative sample
++constexpr uint32_t kPerfBinWidthUs = 1000;
++constexpr uint32_t kPerfBinCount = 1001;      // 0..1 s, final bin is >=1 s
++constexpr uint32_t kPerfStackPattern = 0xa5a5a5a5u;
++
++struct PerfStats {
++    uint32_t samples = 0;
++    uint64_t total_us = 0;
++    uint32_t min_us = 0xffffffffu;
++    uint32_t max_us = 0;
++    uint16_t bins[kPerfBinCount] = {};
++    bool reported = false;
++};
++
++PerfStats g_perf;
++uintptr_t g_perf_stack_fill_end = 0;
++
++extern "C" uint8_t __StackBottom;
++extern "C" uint8_t __StackTop;
++
++uintptr_t read_stack_pointer() {
++    uintptr_t value = 0;
++    asm volatile("mov %0, sp" : "=r"(value));
++    return value;
++}
++
++void perf_prepare_stack() {
++    const uintptr_t bottom = reinterpret_cast<uintptr_t>(&__StackBottom);
++    const uintptr_t top = reinterpret_cast<uintptr_t>(&__StackTop);
++    const uintptr_t sp = read_stack_pointer();
++    constexpr uintptr_t kGuardBytes = 256;
++    uintptr_t fill_end = sp > bottom + kGuardBytes ? sp - kGuardBytes : bottom;
++    if (fill_end > top) {
++        fill_end = top;
++    }
++    fill_end &= ~static_cast<uintptr_t>(3);
++    for (uintptr_t address = bottom; address < fill_end; address += sizeof(uint32_t)) {
++        *reinterpret_cast<volatile uint32_t*>(address) = kPerfStackPattern;
++    }
++    g_perf_stack_fill_end = fill_end;
++}
++
++void perf_report_stack() {
++    const uintptr_t bottom = reinterpret_cast<uintptr_t>(&__StackBottom);
++    const uintptr_t top = reinterpret_cast<uintptr_t>(&__StackTop);
++    uintptr_t first_dirty = bottom;
++    while (first_dirty + sizeof(uint32_t) <= top &&
++           *reinterpret_cast<volatile const uint32_t*>(first_dirty) ==
++               kPerfStackPattern) {
++        first_dirty += sizeof(uint32_t);
++    }
++    const uint32_t used = first_dirty < top ? static_cast<uint32_t>(top - first_dirty) : 0;
++    const uint32_t free = first_dirty > bottom ? static_cast<uint32_t>(first_dirty - bottom) : 0;
++    std::printf("STACK bottom=%08lx top=%08lx fill_end=%08lx first_dirty=%08lx used_bytes=%lu free_bytes=%lu\r\n",
++                static_cast<unsigned long>(bottom), static_cast<unsigned long>(top),
++                static_cast<unsigned long>(g_perf_stack_fill_end),
++                static_cast<unsigned long>(first_dirty), static_cast<unsigned long>(used),
++                static_cast<unsigned long>(free));
++}
++
++void perf_record_frame(uint64_t start_us) {
++    if (g_perf.reported) {
++        return;
++    }
++    const uint64_t elapsed64 = time_us_64() - start_us;
++    const uint32_t elapsed = elapsed64 > 0xffffffffu ? 0xffffffffu
++                                                      : static_cast<uint32_t>(elapsed64);
++    ++g_perf.samples;
++    g_perf.total_us += elapsed;
++    if (elapsed < g_perf.min_us) {
++        g_perf.min_us = elapsed;
++    }
++    if (elapsed > g_perf.max_us) {
++        g_perf.max_us = elapsed;
++    }
++    uint32_t bin = elapsed / kPerfBinWidthUs;
++    if (bin >= kPerfBinCount) {
++        bin = kPerfBinCount - 1;
++    }
++    ++g_perf.bins[bin];
++    if (g_perf.samples != kPerfSampleFrames) {
++        return;
++    }
++
++    const uint32_t rank = (kPerfSampleFrames * 95u + 99u) / 100u;
++    uint32_t cumulative = 0;
++    uint32_t p95_bin = kPerfBinCount - 1;
++    for (uint32_t i = 0; i < kPerfBinCount; ++i) {
++        cumulative += g_perf.bins[i];
++        if (cumulative >= rank) {
++            p95_bin = i;
++            break;
++        }
++    }
++    const uint32_t p95_upper_us = p95_bin == kPerfBinCount - 1
++                                      ? 0xffffffffu
++                                      : (p95_bin + 1) * kPerfBinWidthUs - 1;
++    const uint32_t average_us = static_cast<uint32_t>(g_perf.total_us / g_perf.samples);
++    std::printf("PERF frames=%lu min_us=%lu avg_us=%lu p95_upper_us=%lu max_us=%lu\r\n",
++                static_cast<unsigned long>(g_perf.samples),
++                static_cast<unsigned long>(g_perf.min_us),
++                static_cast<unsigned long>(average_us),
++                static_cast<unsigned long>(p95_upper_us),
++                static_cast<unsigned long>(g_perf.max_us));
++    perf_report_stack();
++    g_perf.reported = true;
++}
++#endif
++
+ // ---------------------------------------------------------------- 定数
+ 
+ constexpr int kFrameMs = 33;         // 約 30fps
+@@ -2265,8 +2377,15 @@
+     g_demo_deadline_us = 0;
+     g_gameover_deadline_us = 0;
+ 
++#if defined(PICO_SKYACE_PERF_DIAGNOSTICS)
++    perf_prepare_stack();
++#endif
++
+     absolute_time_t next_frame = make_timeout_time_ms(kFrameMs);
+     while (true) {
++#if defined(PICO_SKYACE_PERF_DIAGNOSTICS)
++        const uint64_t perf_frame_start_us = time_us_64();
++#endif
+         // フリーズ検知用ウォッチドッグ。
+         watchdog_update();
+ 
+@@ -2377,6 +2496,13 @@
+         display::present_scaled2x(gfx::fb());
+         ++g_frame;
+ 
++#if defined(PICO_SKYACE_PERF_DIAGNOSTICS)
++        // Deliberately exclude sleep_until()/the frame-period wait: the metric
++        // is work spent on input, game update, rendering, LCD transfer, and
++        // interrupts, not idle time inserted to target 30 fps.
++        perf_record_frame(perf_frame_start_us);
++#endif
++
+         sleep_until(next_frame);
+         next_frame = delayed_by_ms(next_frame, kFrameMs);
+         if (absolute_time_diff_us(next_frame, get_absolute_time()) > 200000) {

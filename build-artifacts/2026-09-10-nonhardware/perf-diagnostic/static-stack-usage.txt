@@ -1,0 +1,98 @@
+368	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game.cpp:1780:6:void skyace::game::{anonymous}::render_entities()	368	static
+232	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game.cpp:1437:6:void skyace::game::{anonymous}::update_play()	232	static
+224	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game.cpp:2371:6:void skyace::game::run()	224	static
+200	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/screenshot_capture.cpp:83:6:bool skyace::screenshot::capture(const uint16_t*, int, int)	200	static
+192	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game.cpp:2083:6:void skyace::game::{anonymous}::render_hud()	192	static
+128	/tmp/pico-skyace-perf-src.sKB7mt/src/game/gfx.cpp:132:6:void skyace::gfx::text(int, int, const char*, uint16_t, int)	128	static
+104	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game.cpp:1546:6:void skyace::game::{anonymous}::update_demo_autopilot()	104	static
+80	/tmp/pico-skyace-perf-src.sKB7mt/src/game/gfx.cpp:174:6:void skyace::gfx::art(const char* const*, int, int, int, int, PaletteFn)	80	static
+80	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game.cpp:583:6:void skyace::game::{anonymous}::spawn_enemy()	80	static
+72	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/sd/picocalc_sdcard.cpp:177:6:bool skyace::sdcard::init()	72	static
+72	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game.cpp:855:6:void skyace::game::{anonymous}::finalize_gameover()	72	static
+72	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game.cpp:500:6:skyace::game::{anonymous}::Proj skyace::game::{anonymous}::project(int32_t, int32_t, int32_t)	72	static
+72	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game.cpp:1649:6:void skyace::game::{anonymous}::render_background()	72	static
+72	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game.cpp:1055:6:void skyace::game::{anonymous}::update_guidance_target()	72	static
+64	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/sd/picocalc_sdcard.cpp:291:6:bool skyace::sdcard::write_sectors(uint32_t, const uint8_t*, uint32_t)	64	static
+64	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/sd/picocalc_sdcard.cpp:270:6:bool skyace::sdcard::read_sectors(uint32_t, uint8_t*, uint32_t)	64	static
+64	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/lcd_rgb565_pio.cpp:218:6:void lcd_rgb565_pio_write_dma(const uint16_t*, int)	64	static
+64	/tmp/pico-skyace-perf-src.sKB7mt/src/game/gfx.cpp:48:6:void skyace::gfx::fill_rect(int, int, int, int, uint16_t)	64	static
+56	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/sd/picocalc_sdcard.cpp:82:9:uint8_t skyace::sdcard::{anonymous}::command(uint8_t, uint32_t, uint8_t, uint8_t*, int)	56	static
+56	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/sd/picocalc_sdcard.cpp:312:6:bool skyace::sdcard::get_sector_count(uint32_t*)	56	static
+56	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/picocalc_audio.cpp:414:6:void skyace::audio::music_play(const MusicNote*, int, const MusicNote*, int, const MusicNote*, int, const MusicNote*, int, const DrumNote*, int, bool)	56	static
+56	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/lcd_rgb565_pio.cpp:172:6:void lcd_rgb565_pio_init(bool)	56	static
+56	/tmp/pico-skyace-perf-src.sKB7mt/src/game/gfx.cpp:97:6:void skyace::gfx::fill_circle(int, int, int, uint16_t)	56	static
+56	/tmp/pico-skyace-perf-src.sKB7mt/src/game/gfx.cpp:54:6:void skyace::gfx::rect_outline(int, int, int, int, uint16_t)	56	static
+56	/tmp/pico-skyace-perf-src.sKB7mt/src/game/gfx.cpp:108:6:void skyace::gfx::circle_outline(int, int, int, uint16_t)	56	static
+56	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game.cpp:2339:6:void skyace::game::{anonymous}::render_gameover()	56	static
+48	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/picocalc_keyboard.cpp:41:6:bool skyace::keyboard::read_event(KeyEvent*)	48	static
+48	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/picocalc_display.cpp:25:6:void skyace::display::present_scaled2x(const uint16_t*)	48	static
+48	/tmp/pico-skyace-perf-src.sKB7mt/src/game/gfx.cpp:70:6:void skyace::gfx::line(int, int, int, int, uint16_t)	48	static
+48	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game.cpp:840:6:void skyace::game::{anonymous}::enter_title(const char*)	48	static
+48	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game.cpp:2274:6:void skyace::game::{anonymous}::render_title()	48	static
+48	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game.cpp:1964:6:void skyace::game::{anonymous}::draw_guidance_arrow(int, int, int, int, uint16_t)	48	static
+40	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/picocalc_audio.cpp:286:6:bool skyace::audio::{anonymous}::timer_callback(repeating_timer_t*)	40	static
+40	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/picocalc_audio.cpp:105:9:int32_t skyace::audio::{anonymous}::music_voice_render(int)	40	static
+40	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/lcd_rgb565_pio.cpp:269:6:void lcd_rgb565_pio_fill_rect_dma(int, int, int, int, uint16_t)	40	static
+40	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game.cpp:1925:6:bool skyace::game::{anonymous}::edge_arrow_for_projection(const Proj&, int*, int*, int*, int*)	40	static
+32	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/picocalc_keyboard.cpp:72:9:uint8_t skyace::keyboard::read_backlight()	32	static
+32	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/picocalc_keyboard.cpp:64:6:bool skyace::keyboard::set_backlight(uint8_t)	32	static
+32	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/lcd_rgb565_pio.cpp:253:6:void lcd_rgb565_pio_fill_rect_blocking(int, int, int, int, uint16_t)	32	static
+32	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/lcd_rgb565_pio.cpp:178:6:void lcd_rgb565_pio_set_window(int, int, int, int)	32	static
+32	/tmp/pico-skyace-perf-src.sKB7mt/src/main.cpp:16:5:int main()	32	static
+32	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game.cpp:545:6:void skyace::game::{anonymous}::refresh_enemy_projection()	32	static
+32	/tmp/pico-skyace-perf-src.sKB7mt/src/game/fixed_math.cpp:44:10:uint32_t skyace::fixmath::isqrt64(uint64_t)	32	static
+24	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/picocalc_audio.cpp:388:6:void skyace::audio::init()	24	static
+24	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/lcd_rgb565_pio.cpp:203:6:void lcd_rgb565_pio_write_blocking(const uint16_t*, int)	24	static
+24	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game.cpp:819:6:void skyace::game::{anonymous}::enter_demo()	24	static
+24	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game.cpp:748:6:void skyace::game::{anonymous}::set_engine_for_controls()	24	static
+24	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game.cpp:2318:6:void skyace::game::{anonymous}::render_pause()	24	static
+24	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game.cpp:2267:6:void skyace::game::{anonymous}::render_play()	24	static
+20	/tmp/pico-skyace-perf-src.sKB7mt/src/game/gfx.cpp:32:6:void skyace::gfx::hspan(int, int, int, uint16_t)	20	static
+16	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/sd/picocalc_sdcard.cpp:170:6:bool skyace::sdcard::is_present()	16	static
+16	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/sd/fatfs_diskio.cpp:45:9:DRESULT disk_ioctl(BYTE, BYTE, void*)	16	static
+16	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/picocalc_display.cpp:18:6:void skyace::display::clear_black()	16	static
+16	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/lcd_rgb565_pio.cpp:71:6:void {anonymous}::write_command1(uint8_t, uint8_t)	16	static
+16	/tmp/pico-skyace-perf-src.sKB7mt/src/game/gfx.cpp:163:5:int skyace::gfx::art_width(const char* const*, int)	16	static
+16	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game_rules.cpp:35:6:void skyace::game_rules::InputState::block_held()	16	static
+16	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game.cpp:650:6:void skyace::game::{anonymous}::reset_game()	16	static
+16	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game.cpp:477:6:void skyace::game::{anonymous}::update_camera_transform()	16	static
+16	/tmp/pico-skyace-perf-src.sKB7mt/src/game/fixed_math.cpp:38:9:uint8_t skyace::fixmath::atan2_brad(int32_t, int32_t)	16	static
+16	/tmp/pico-skyace-perf-src.sKB7mt/src/game/fixed_math.cpp:14:6:void skyace::fixmath::init()	16	static
+12	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/lcd_rgb565_pio.cpp:52:6:void {anonymous}::write_command(uint8_t)	12	static
+12	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game_rules.cpp:11:6:void skyace::game_rules::InputState::apply_event(uint8_t, skyace::game_rules::InputEventState)	12	static
+8	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/sd/fatfs_diskio.cpp:7:9:DSTATUS disk_initialize(BYTE)	8	static
+8	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/sd/fatfs_diskio.cpp:36:9:DRESULT disk_write(BYTE, const BYTE*, LBA_t, UINT)	8	static
+8	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/sd/fatfs_diskio.cpp:27:9:DRESULT disk_read(BYTE, BYTE*, LBA_t, UINT)	8	static
+8	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/sd/fatfs_diskio.cpp:17:9:DSTATUS disk_status(BYTE)	8	static
+8	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/picocalc_keyboard.cpp:29:6:void skyace::keyboard::init()	8	static
+8	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/picocalc_display.cpp:13:6:void skyace::display::init()	8	static
+8	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/picocalc_audio.cpp:406:6:void skyace::audio::set_engine(uint8_t, uint8_t, int8_t)	8	static
+8	/tmp/pico-skyace-perf-src.sKB7mt/src/game/gfx.cpp:63:6:void skyace::gfx::put_pixel(int, int, uint16_t)	8	static
+8	/tmp/pico-skyace-perf-src.sKB7mt/src/game/gfx.cpp:159:5:int skyace::gfx::text_width(const char*, int)	8	static
+8	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game_rules.cpp:7:6:void skyace::game_rules::InputState::begin_frame()	8	static
+8	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game_rules.cpp:58:6:bool skyace::game_rules::is_same_target(int, uint32_t, int, bool, uint32_t)	8	static
+8	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game_rules.cpp:45:14:skyace::game_rules::DamageResult skyace::game_rules::apply_damage(int, DeathReason, int, DeathReason)	8	static
+8	/tmp/pico-skyace-perf-src.sKB7mt/src/game/fixed_math.cpp:29:9:int32_t skyace::fixmath::tan_q12(int32_t)	8	static
+8	/home/fuyuki/pico_dvl/codex/pico-sdk/src/rp2_common/pico_cxx_options/new_delete.cpp:30:6:void operator delete [](void*, std::size_t)	8	static
+8	/home/fuyuki/pico_dvl/codex/pico-sdk/src/rp2_common/pico_cxx_options/new_delete.cpp:28:6:void operator delete(void*, std::size_t)	8	static
+8	/home/fuyuki/pico_dvl/codex/pico-sdk/src/rp2_common/pico_cxx_options/new_delete.cpp:24:6:void operator delete [](void*)	8	static
+8	/home/fuyuki/pico_dvl/codex/pico-sdk/src/rp2_common/pico_cxx_options/new_delete.cpp:22:6:void operator delete(void*)	8	static
+8	/home/fuyuki/pico_dvl/codex/pico-sdk/src/rp2_common/pico_cxx_options/new_delete.cpp:18:7:void* operator new [](std::size_t)	8	static
+8	/home/fuyuki/pico_dvl/codex/pico-sdk/src/rp2_common/pico_cxx_options/new_delete.cpp:14:7:void* operator new(std::size_t)	8	static
+0	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/sd/picocalc_sdcard.cpp:339:6:void skyace::sdcard::reset()	0	static
+0	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/sd/picocalc_sdcard.cpp:266:6:bool skyace::sdcard::is_initialized()	0	static
+0	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/picocalc_audio.cpp:447:6:void skyace::audio::play_sfx(Sfx)	0	static
+0	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/picocalc_audio.cpp:438:6:void skyace::audio::music_stop()	0	static
+0	/tmp/pico-skyace-perf-src.sKB7mt/src/platform/lcd_rgb565_pio.cpp:164:6:void lcd_rgb565_pio_wait_dma()	0	static
+0	/tmp/pico-skyace-perf-src.sKB7mt/src/game/gfx.cpp:26:6:void skyace::gfx::clear(uint16_t)	0	static
+0	/tmp/pico-skyace-perf-src.sKB7mt/src/game/gfx.cpp:22:11:uint16_t* skyace::gfx::fb()	0	static
+0	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game.cpp:435:10:uint16_t skyace::game::{anonymous}::enemy_palette_interceptor(char)	0	static
+0	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game.cpp:427:10:uint16_t skyace::game::{anonymous}::enemy_palette_bomber(char)	0	static
+0	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game.cpp:419:10:uint16_t skyace::game::{anonymous}::enemy_palette_fighter(char)	0	static
+0	/tmp/pico-skyace-perf-src.sKB7mt/src/game/game.cpp:408:10:uint16_t skyace::game::{anonymous}::plane_palette(char)	0	static
+0	/tmp/pico-skyace-perf-src.sKB7mt/src/game/fixed_math.cpp:79:10:uint32_t skyace::fixmath::rnd_fx()	0	static
+0	/tmp/pico-skyace-perf-src.sKB7mt/src/game/fixed_math.cpp:75:6:void skyace::fixmath::seed_fx_rng(uint32_t)	0	static
+0	/tmp/pico-skyace-perf-src.sKB7mt/src/game/fixed_math.cpp:71:6:void skyace::fixmath::seed_rng(uint32_t)	0	static
+0	/tmp/pico-skyace-perf-src.sKB7mt/src/game/fixed_math.cpp:62:10:uint32_t skyace::fixmath::rnd()	0	static
+0	/tmp/pico-skyace-perf-src.sKB7mt/src/game/fixed_math.cpp:25:9:int32_t skyace::fixmath::cos_q12(uint8_t)	0	static
+0	/tmp/pico-skyace-perf-src.sKB7mt/src/game/fixed_math.cpp:21:9:int32_t skyace::fixmath::sin_q12(uint8_t)	0	static

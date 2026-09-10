@@ -150,6 +150,14 @@ SDのカード検出Highは一時的なエミュレーター診断差分で明�
 `scenario_done`、例外なし、unsupported MMIOなし、キーボードdrop 0で合格した。
 これは20分連続プレイとフレーム時間p95のリリースゲートを満たすものではない。
 
+診断コードを一時的に加えたBINでは、LCD画素デコードを省略した高速PIOシンク上で
+300フレームの処理時間とスタック高水位も集計した（
+[`perf-diagnostic`](../../../build-artifacts/2026-09-10-nonhardware/perf-diagnostic/)）。
+結果はmin `183502 µs`、平均 `247292 µs`、p95上限 `264999 µs`、max `268438 µs`、
+スタック使用`944/4096 bytes`だった。ただし、これはエミュレーター仮想時間と診断
+バックエンドの値であり、実機の33ms合否や実LCD転送込みの性能を示さない。
+製品BINには計測コードを含めていない。
+
 長時間UARTとSDの一部はLCD画素デコードを省略した高速PIOシンク
 （[`backend-fast-uart.patch`](../../../build-artifacts/2026-09-10-nonhardware/backend-fast-uart.patch)）
 を使用した。したがって、それらは状態遷移・入力・ファイルI/Oの検証であり、

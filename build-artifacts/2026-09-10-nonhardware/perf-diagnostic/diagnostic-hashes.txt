@@ -1,0 +1,2 @@
+6850194045f2515384a43e1edcdd3e60eed8da1715d8c70616b7668858c7ea7c  /tmp/pico-skyace-perf-build.My8HeV/pico_skyace.elf
+4c1fe5a50db1015035f98b8b58a8b4c2ce3435decc143987d1c1e3b76ff44397  /tmp/pico-skyace-perf-build.My8HeV/pico_skyace.bin

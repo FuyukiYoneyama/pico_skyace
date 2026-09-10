@@ -1,0 +1,30 @@
+build/pico_skyace.elf  :
+section                  size        addr
+.boot2                    256   268435456
+.text                   70916   268435712
+.rodata                 15896   268506632
+.binary_info               40   268522528
+.ram_vector_table         192   536870912
+.uninitialized_data         0   536871104
+.data                     656   536871104
+.tdata                      0   536871760
+.tbss                       0   536871760
+.bss                    58972   536871760
+.heap                    2048   536930732
+.scratch_x                  0   537133056
+.scratch_y                  0   537137152
+.stack_dummy             4096   537137152
+.ARM.attributes            40           0
+.comment                   38           0
+.debug_info            325010           0
+.debug_abbrev           43019           0
+.debug_loclists        201034           0
+.debug_aranges           6432           0
+.debug_rnglists         26920           0
+.debug_line            220058           0
+.debug_str              40458           0
+.debug_frame            14872           0
+.debug_line_str           762           0
+Total                 1031715
+
+
