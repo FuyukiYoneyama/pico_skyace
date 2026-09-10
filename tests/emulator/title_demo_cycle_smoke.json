@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "name": "pico-skyace-title-demo-cycle-smoke",
+  "description": "Run the production-timing title-to-demo-to-title cycle.",
+  "poll_ms": 10,
+  "steps": [
+    {
+      "op": "wait_until",
+      "label": "firmware initialized",
+      "condition": {"kind": "uart_contains", "text": "BACKLIGHT set level=220 ok=1"},
+      "timeout_ms": 3000
+    },
+    {
+      "op": "wait_until",
+      "label": "title enters demo after 30 seconds",
+      "condition": {"kind": "uart_contains", "text": "MODE Title->Demo"},
+      "timeout_ms": 33000
+    },
+    {"op": "wait", "ms": 500},
+    {"op": "snapshot", "png": "demo-cycle.png"},
+    {
+      "op": "assert",
+      "label": "demo frame is rendered",
+      "condition": {"kind": "region_non_black", "x": 0, "y": 0, "w": 320, "h": 320, "min": 1}
+    },
+    {
+      "op": "wait_until",
+      "label": "demo returns to title after 30 seconds",
+      "condition": {"kind": "uart_contains", "text": "MODE Demo->Title(timeout)"},
+      "timeout_ms": 33000
+    },
+    {"op": "wait", "ms": 500},
+    {"op": "snapshot", "png": "title-after-demo.png"},
+    {
+      "op": "assert",
+      "label": "title frame after demo is rendered",
+      "condition": {"kind": "region_non_black", "x": 0, "y": 0, "w": 320, "h": 320, "min": 1}
+    }
+  ]
+}

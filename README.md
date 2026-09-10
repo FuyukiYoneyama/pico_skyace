@@ -162,6 +162,10 @@ third_party/
 
 今後の改善方針・優先順位・検証条件は [アップデート計画](docs/UPDATE_PLAN.md) を参照。
 
+公開時の変更履歴は [CHANGELOG](CHANGELOG.md)、同梱コード・BGM・第三者コンポーネントの
+帰属と配布条件は [NOTICE](NOTICE.md)、v1.0.0の公開判定は
+[リリースチェックリスト](docs/RELEASE_CHECKLIST.md) に記録する。
+
 `VERSION` ファイルで管理（major.minor.patch）。ソース挙動が変わるビルドを
 渡すときは必ず数値を上げること。現在のバージョンは `0.9.3` で、タイトル画面の
 `VERSION` 表示と起動時UARTログに反映される。

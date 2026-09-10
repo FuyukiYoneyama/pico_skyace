@@ -1,0 +1,57 @@
+{
+  "schema": 1,
+  "name": "pico-skyace-gameover-timeout-smoke",
+  "description": "Crash deliberately, then verify game-over returns to title after 10 seconds.",
+  "poll_ms": 10,
+  "steps": [
+    {
+      "op": "wait_until",
+      "label": "firmware initialized",
+      "condition": {"kind": "uart_contains", "text": "BACKLIGHT set level=220 ok=1"},
+      "timeout_ms": 3000
+    },
+    {
+      "op": "key_events",
+      "label": "start Play",
+      "gap_ms": 50,
+      "events": [
+        {"state": "pressed", "code": 10},
+        {"state": "released", "code": 10}
+      ]
+    },
+    {"op": "wait", "ms": 200},
+    {
+      "op": "key_events",
+      "label": "hold nose down until crash",
+      "events": [
+        {"state": "pressed", "code": 182}
+      ]
+    },
+    {
+      "op": "wait_until",
+      "label": "play enters game over",
+      "condition": {"kind": "uart_contains", "text": "MODE Play->GameOver"},
+      "timeout_ms": 25000
+    },
+    {
+      "op": "key_events",
+      "label": "release nose-down",
+      "events": [
+        {"state": "released", "code": 182}
+      ]
+    },
+    {
+      "op": "wait_until",
+      "label": "game over returns to title after 10 seconds",
+      "condition": {"kind": "uart_contains", "text": "MODE GameOver->Title(timeout)"},
+      "timeout_ms": 11000
+    },
+    {"op": "wait", "ms": 500},
+    {"op": "snapshot", "png": "title-after-gameover.png"},
+    {
+      "op": "assert",
+      "label": "title frame after game over is rendered",
+      "condition": {"kind": "region_non_black", "x": 0, "y": 0, "w": 320, "h": 320, "min": 1}
+    }
+  ]
+}

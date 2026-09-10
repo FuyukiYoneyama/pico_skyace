@@ -1,0 +1,56 @@
+# v1.0.0 release checklist
+
+This is the maintainer's release record for the RP2040 PicoCalc target. It is a
+release gate, not a requirement that an end user discover controls without
+documentation. User testing is optional feedback; the required evidence is
+build, behavior, target hardware, and distribution evidence.
+
+## Scope
+
+The v1.0.0 scope is the current endless-wave Sky Ace game on the standard
+RP2040 PicoCalc configuration: title, play, pause, game-over, demo, weapons,
+enemy AI, HUD, audio, and optional SD screenshots. Pico 2/RP2350 is outside the
+supported target until separately tested.
+
+## Already present in the repository
+
+- [x] MIT license for the project's original source (`LICENSE`).
+- [x] Consolidated attribution and fan-made/trademark notice (`NOTICE.md`).
+- [x] FatFs R0.14a license retained with the vendored source.
+- [x] BGM provenance and distribution record (`docs/BGM_PROVENANCE.md`).
+- [x] Build and operation instructions in `README.md`.
+- [x] Host logic test target; current result: 1/1 test passed.
+- [x] RP2040 Release UF2 build; current artifact is in `build/`.
+- [x] Emulator smoke evidence for boot/title/play/pause/audio and a shortened
+      real-play demo path; see `docs/validation/2026-09-10-demo/BUILD.md`.
+- [x] Production-timing emulator scenarios are now checked in for the complete
+      title/demo cycle and game-over timeout (`tests/emulator/`).
+
+## Required before creating the v1.0.0 tag
+
+- [ ] Change `VERSION` and all versioned release text to `1.0.0`.
+- [ ] Rebuild from the final tagged source with the documented SDK/toolchain,
+      record size information and the UF2 SHA-256.
+- [ ] Run the production binary (without shortened demo timing) through
+      `title_demo_cycle_smoke.json`, `gameover_timeout_smoke.json`, direct
+      retry, pause/resume, and the weapon/target edge cases; archive the reports.
+      The complete title/demo scenario needs an explicit runner budget (the
+      default `1,000,000,000` cycles stops before 30 seconds of firmware time),
+      for example `--cycles 20000000000`.
+- [ ] Verify the final UF2 on an actual standard RP2040 PicoCalc: cold boot,
+      LCD, keyboard, simultaneous input, BGM/SFX/engine audio, SD screenshot
+      success and no-card recovery, and power-cycle recovery.
+- [ ] Record a 20-minute upper-load play run and frame-time/memory evidence;
+      the plan's provisional target is a 33 ms 95th-percentile frame.
+- [ ] Capture title/gameplay images from the final firmware, or label older
+      images as historical rather than presenting them as v1.0 screenshots.
+- [ ] Create the `v1.0.0` Git tag and GitHub Release, attaching the UF2 and its
+      checksum alongside `CHANGELOG.md`, `NOTICE.md`, and the supported-target
+      notes.
+
+## Stop conditions
+
+Do not label an item passed from source inspection alone when it requires a
+physical device or a production-timing run. If a target-hardware run is not
+available, publish the firmware as a preview/development build instead of
+calling it a tested v1.0.0 release.
