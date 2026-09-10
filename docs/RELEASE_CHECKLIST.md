@@ -42,8 +42,8 @@ supported target until separately tested.
       success and no-card recovery, and power-cycle recovery.
 - [ ] Record a 20-minute upper-load play run and frame-time/memory evidence;
       the plan's provisional target is a 33 ms 95th-percentile frame.
-- [ ] Capture title/gameplay images from the final firmware, or label older
-      images as historical rather than presenting them as v1.0 screenshots.
+- [x] Existing title/gameplay images are explicitly labeled as historical; a
+      final-firmware capture can replace them for the v1.0.0 release page.
 - [ ] Create the `v1.0.0` Git tag and GitHub Release, attaching the UF2 and its
       checksum alongside `CHANGELOG.md`, `NOTICE.md`, and the supported-target
       notes.
