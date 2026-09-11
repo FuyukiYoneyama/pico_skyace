@@ -15,6 +15,8 @@ claimed until the production build and the target-hardware gate are complete.
   The attack warning remains in place so the stronger attack is still readable.
 - Added explicit incoming-attack direction cues: `FROM ...` text plus a red
   direction arrow around the reticle, including rear and diagonal directions.
+- Varied the final notes of the second repetition in each title-music phrase
+  unit while keeping the phrase timing and full track length unchanged.
 
 ## [0.9.3] - 2026-09-10
 

@@ -32,3 +32,13 @@
 - 原因: 公式LCDの画素転送モデルが初期化・描画に時間を要し、今回の短い実行枠を超えた。
 - 次回の成功経路: 同じ長時間の公式LCD経路は再試行せず、ホストテストとRP2040ビルドを確認根拠にする。必要な実機表示確認は実機テスト時に行う。
 - 再試行禁止: 同じcycles・公式LCDモデル・短い実行枠の組み合わせを繰り返さない。
+
+## 2026-09-11: BGM host test reused a cleaned temporary build directory
+
+- 対象: BGMフレーズ変更後のホストテスト再確認
+- 環境: WSL bash、`/tmp/pico-skyace-threat-host.SAXwMa`
+- 失敗コマンド: `ctest --test-dir /tmp/pico-skyace-threat-host.SAXwMa --output-on-failure`
+- 終了結果: 一時ディレクトリが存在せず、CTestは実行されなかった。
+- 原因: 前回の一時ホストビルドが保持される前提で、存在確認なしに再利用した。
+- 次回の成功経路: 新しい明示的な`mktemp -d /tmp/...`へホストテストを構成し直してから実行する。
+- 再試行禁止: 消去済みの`/tmp/pico-skyace-threat-host.SAXwMa`を同じパスで再利用しない。

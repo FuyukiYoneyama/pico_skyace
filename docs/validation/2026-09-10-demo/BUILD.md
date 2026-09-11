@@ -221,6 +221,24 @@ Wave攻撃性調整は完了扱いとする。1.0.0最終UF2では同じ挙動�
   `build/pico_skyace.uf2` =
   `66f4bf2dba8a922e526a6aa2983660c95eabb22944fa2f5759d71ae1bd09f8ab`。
 
+## タイトル曲終端変化ビルド（2026-09-11）
+
+A〜Hの各3.2秒フレーズについて、2回目の末尾4音だけを別の着地形へ変更した。
+基本TAILとTAIL_ALTの長さはどちらも800msで、リード総時間は`102700ms`のまま
+一致することを専用チェックで確認した。これは`VERSION`を1.0.0へ変更していない
+開発ビルドである。
+
+- ホストテスト: CTest `1/1` 合格。
+- BGMリード総時間チェック: `lead_duration_ms=102700 expected=102700`。
+- RP2040 Releaseビルド: 新規警告なし。
+- サイズ: `text=95676 data=0 bss=59164 dec=154840`。
+- SHA-256: `build/pico_skyace.bin` =
+  `277bfb26162c907afe632d67ae87de5fb923db93ecc54a4d5e8774a2e5dc94f1`、
+  `build/pico_skyace.elf` =
+  `68be97e84ad82839d16974d3d208a3bbb6785ee1fca043b94cba6e8eefde7dbd`、
+  `build/pico_skyace.uf2` =
+  `b0f71b8fce3708c0c1cc964b24859db9e1404c3119737e9ff2294fd474e5f068`。
+
 ## 20分上限負荷（ユーザー報告）
 
 2026-09-10、ユーザーから20分間の上限負荷プレイが問題なく完了した（OK）との
