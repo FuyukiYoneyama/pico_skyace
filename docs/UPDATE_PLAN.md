@@ -62,8 +62,12 @@ SHA-256とエミュレーター起動証跡を`validation/2026-09-12-v1.0.0/`へ
 `de9dd26802ebf2e3428ea22241d1fe87cd8d892c4a29264c6a9e12de923e6913`である。
 エミュレーターのタイトル版表示スモークは5/5ステップ合格、例外・unsupported MMIO・
 LCD画素dropなしだった。残りは、このUF2を実機へ書き込み、先頭の
-`PICO_SKYACE_BOOT ... version=1.0.0`と基本スモークを確認してSHA-256と結び付けることだけで、
-それまではタグを作成しない。GitHub ReleaseはリポジトリをPublicへ変更した後に作成する。
+`PICO_SKYACE_BOOT ... version=1.0.0`と基本スモークを確認してSHA-256と結び付けることだけ
+だった。`20260912_173039.log`（UF2Loader起動＋電源OFF/ON起動、SHA-256
+`38455a14e43b762d8306298061be312b787371acd7c99c2fa4269e8c5b8a3bca`）で両経路の
+Title→Wave 4 Demo→Titleを確認し、電源OFF/ON列の`WATCHDOG_CAUSED_REBOOT=0`も確認済みである。
+実機ゲートは完了したため、残りはリポジトリをPublicへ変更した後のタグ／GitHub Release作成だけである。
+同じUF2とSHA-256を添付し、それまではタグを作成しない。
 直前は [v0.9.13 ハイスコア・README画像更新ビルド記録](validation/2026-09-12-v0.9.13/BUILD.md)。
 直前は [v0.9.12 ミサイル発射位置・README構成調整ビルド記録](validation/2026-09-12-v0.9.12/BUILD.md)。
 直前のミサイル発射位置・機銃トレーサ調整は [v0.9.11ビルド記録](validation/2026-09-12-v0.9.11/BUILD.md)。

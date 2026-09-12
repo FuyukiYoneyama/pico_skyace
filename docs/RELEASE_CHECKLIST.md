@@ -57,8 +57,9 @@ supported target until separately tested.
 
 The current verification build is `1.0.0`. This is the final version-only
 release-preparation step; no game source behavior or diagnostic-only change is
-being made under `1.0.0`. The tag and GitHub Release remain pending until the
-final UF2 is tied to the target-hardware smoke record.
+being made under `1.0.0`. The final UF2 is now tied to the target-hardware smoke
+record; the tag and GitHub Release remain pending until the repository is made
+Public.
 
 ## Required before creating the v1.0.0 tag
 
@@ -113,10 +114,15 @@ final UF2 is tied to the target-hardware smoke record.
       starting with `PICO_SKYACE_BOOT ... version=0.9.18`, with
       `WATCHDOG_CAUSED_REBOOT=0` and successful LCD/keyboard/SD/high-score
       initialization. Its SHA-256 is recorded in the v0.9.18 build record.
-- [ ] After the final `1.0.0` build, associate that exact UF2 SHA-256 and build
-      ID with a short real-device smoke log. The v0.9.18 hardware log proves
-      the cold-boot UART fix, but does not by itself identify the future
-      `1.0.0` UF2.
+- [x] After the final `1.0.0` build, associate that exact UF2 SHA-256 and build
+      ID with a short real-device smoke log. The preserved
+      [`20260912_173039.log`](validation/2026-09-12-v1.0.0/hardware/20260912_173039.log)
+      contains both the UF2Loader boot and a subsequent power-off/on boot. Both
+      report `version=1.0.0` and build ID `2026-09-12T08:24:02Z`; the power-cycle
+      sequence reports `WATCHDOG_CAUSED_REBOOT=0`. Each sequence reaches Wave 4
+      Demo and returns to Title after the 30-second Demo timeout. The log
+      SHA-256 is `38455a14e43b762d8306298061be312b787371acd7c99c2fa4269e8c5b8a3bca`,
+      and it is included in the v1.0.0 validation manifest.
 - [x] User-reported 20-minute upper-load play run completed without issue on
       2026-09-10. This is a manual stability-acceptance record; the tested
       UF2 hash, UART log, and exact run metadata were not supplied.

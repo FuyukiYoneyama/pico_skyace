@@ -1,7 +1,8 @@
 5b1513b5bda00504f4290ad3bcd83dae4c5e8120cf9f9869722e059ec607fb43  build-artifacts/2026-09-12-v1.0.0/emulator-title/report.json
 e38c23760002b67c776f08cde1b0c03debafc719d44d7bf1ea7da9fe18749e5d  build-artifacts/2026-09-12-v1.0.0/emulator-title/uart.log
 94908e899b15ecdf4e4bb7ba1498ab414c7272ce230789f2e4321714427faefa  build-artifacts/2026-09-12-v1.0.0/emulator-title/snapshots/title-version.png
-5fa424e69a634d9d5e9b8f2bf2eb47900e7bff766458929dabf89baa88e02d2a  docs/validation/2026-09-12-v1.0.0/BUILD.md
+38455a14e43b762d8306298061be312b787371acd7c99c2fa4269e8c5b8a3bca  docs/validation/2026-09-12-v1.0.0/hardware/20260912_173039.log
+bef0946defa1f5e36951ff22ce3f14cf6296b6fe8e2c23060df5a84c5e7e1bdf  docs/validation/2026-09-12-v1.0.0/BUILD.md
 de9dd26802ebf2e3428ea22241d1fe87cd8d892c4a29264c6a9e12de923e6913  build/pico_skyace.uf2
 b9818e5d331530984c59112adf54f717a3be73f6edafd1fd9d65f615d2790177  build/pico_skyace.elf
 3c69e911faea5eca959bc653e26bca10fdfbe2e72bdf8d398237334e042cc007  build/pico_skyace.bin

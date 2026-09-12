@@ -8,14 +8,16 @@ UF2 asset.
 
 Release preparation for v1.0.0 is tracked in
 [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md). No v1.0.0 firmware is
-claimed until the production build and the target-hardware gate are complete.
+claimed as a public release until the repository is Public and the versioned tag
+and GitHub Release are created.
 
 ## [1.0.0] - 2026-09-12 (release preparation)
 
 - Final version-only release-preparation build. Game behavior is unchanged from
   v0.9.18; the version, final build artifacts, and their verification record
-  are fixed before the public tag and GitHub Release. The final UF2 still needs
-  a short target-hardware smoke record before it can be tagged.
+  are fixed before the public tag and GitHub Release. The final UF2 is tied to
+  the target-hardware smoke record; the public tag remains pending until the
+  repository is made Public.
 
 - Documented that the product config runs RP2040 at 250 MHz for LCD timing,
   above the 133 MHz limit stated in Raspberry Pi's RP2040 specifications, and

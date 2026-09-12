@@ -1,0 +1,48 @@
+PICO_SKYACE_BOOT app=pico_skyace version=1.0.0 build="2026-09-12T08:24:02Z" WATCHDOG_CAUSED_REBOOT=1 clock_ok=1 sysclk_target_khz=250000 sysclk_actual_khz=250000 uart_baud=115200 phase=stdio
+pico_skyace version 1.0.0
+BUILD ID id="2026-09-12T08:24:02Z"
+WATCHDOG_CAUSED_REBOOT=1
+set_sys_clock_khz(250000) ok=1 sysclk=250000 kHz
+PICO_SKYACE_BOOT app=pico_skyace version=1.0.0 build="2026-09-12T08:24:02Z" phase=display
+LCD NESco-style init sequence sent 0x3A=0x65 RGB565
+DISPLAY init ok (verified lcd_rgb565_pio driver, blocking mode, clkdiv=4.00, spi=31.25MHz, reset=10/10/200ms)
+KEYBOARD init ok i2c1 addr=0x1f hz=400000
+BACKLIGHT before=32
+BACKLIGHT set level=220 ok=1
+SD detect gpio22=0 present=1
+SD detect gpio22=0 present=1
+SD init spi=0 sck=18 mosi=19 miso=16 cs=17
+SD init status=ok sdhc=1 baud=12000000
+HIGHSCORE load status=ok score=3300 slots=1/1
+WAVE START wave=4 enemies=5 aggression=3 frame=532
+SPAWN wave=4 type=2
+SPAWN wave=4 type=0
+SPAWN wave=4 type=1
+SPAWN wave=4 type=0
+SPAWN wave=4 type=0
+MODE Title->Demo frame=532 time_us=31299518
+MODE Demo->Title(timeout) frame=1029 time_us=61299866
+PICO_SKYACE_BOOT app=pico_skyace version=1.0.0 build="2026-09-12T08:24:02Z" WATCHDOG_CAUSED_REBOOT=0 clock_ok=1 sysclk_target_khz=250000 sysclk_actual_khz=250000 uart_baud=115200 phase=stdio
+pico_skyace version 1.0.0
+BUILD ID id="2026-09-12T08:24:02Z"
+WATCHDOG_CAUSED_REBOOT=0
+set_sys_clock_khz(250000) ok=1 sysclk=250000 kHz
+PICO_SKYACE_BOOT app=pico_skyace version=1.0.0 build="2026-09-12T08:24:02Z" phase=display
+LCD NESco-style init sequence sent 0x3A=0x65 RGB565
+DISPLAY init ok (verified lcd_rgb565_pio driver, blocking mode, clkdiv=4.00, spi=31.25MHz, reset=10/10/200ms)
+KEYBOARD init ok i2c1 addr=0x1f hz=400000
+BACKLIGHT before=32
+BACKLIGHT set level=220 ok=1
+SD detect gpio22=0 present=1
+SD detect gpio22=0 present=1
+SD init spi=0 sck=18 mosi=19 miso=16 cs=17
+SD init status=ok sdhc=1 baud=12000000
+HIGHSCORE load status=ok score=3300 slots=1/1
+WAVE START wave=4 enemies=5 aggression=3 frame=532
+SPAWN wave=4 type=2
+SPAWN wave=4 type=0
+SPAWN wave=4 type=1
+SPAWN wave=4 type=0
+SPAWN wave=4 type=0
+MODE Title->Demo frame=532 time_us=31438650
+MODE Demo->Title(timeout) frame=1029 time_us=61438975

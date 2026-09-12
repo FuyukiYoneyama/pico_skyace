@@ -73,18 +73,32 @@ PICO_SKYACE_BOOT app=pico_skyace version=1.0.0 build="2026-09-12T08:24:02Z" WATC
 - レポート: [`report.json`](../../../build-artifacts/2026-09-12-v1.0.0/emulator-title/report.json)
 - UARTログ: [`uart.log`](../../../build-artifacts/2026-09-12-v1.0.0/emulator-title/uart.log)
 - 画面キャプチャ: [`title-version.png`](../../../build-artifacts/2026-09-12-v1.0.0/emulator-title/snapshots/title-version.png)
+- 実機UARTログ（UF2Loader起動＋電源OFF/ON起動）:
+  [`20260912_173039.log`](hardware/20260912_173039.log)
 - SHA-256マニフェスト: [`MANIFEST.sha256`](MANIFEST.sha256)
 
 ## 実機受入との対応
 
-既存の `v0.9.18` 実機ログはUART整定待ちと周辺初期化の修正を確認する証跡で
-ある。今回の最終UF2は版番号だけが異なるため、公開前にこの記録のUF2を実機へ
-書き込み、短いスモーク（電源投入、LCD、キー入力、音、Title→Demo→Titleまたは
-Play開始）を行う。そのログの先頭に
-`PICO_SKYACE_BOOT ... version=1.0.0 ...` と上記 `BUILD_ID` が出ることを確認し、
-このUF2のSHA-256と結び付けるまで、実機ゲートは未完了とする。
+実機ログ `/home/fuyuki/pico_dvl/codex/log/20260912_173039.log`（48行、SHA-256
+`38455a14e43b762d8306298061be312b787371acd7c99c2fa4269e8c5b8a3bca`）を
+プロジェクト内へ同一内容で保全した。ログ中の2つの起動列は、いずれも
+`version=1.0.0`、`BUILD ID id="2026-09-12T08:24:02Z"`、
+`sysclk_actual_khz=250000`で、最終UF2のSHA-256
+`de9dd26802ebf2e3428ea22241d1fe87cd8d892c4a29264c6a9e12de923e6913`と対応する。
+
+- 1列目（UF2Loaderによるブート）: `WATCHDOG_CAUSED_REBOOT=1`。Wave 4の
+  Demoが31.299秒付近で開始し、30秒後の`MODE Demo->Title(timeout)`まで完走した。
+- 2列目（電源OFF/ONによるブート）: `WATCHDOG_CAUSED_REBOOT=0`。Wave 4の
+  Demoが31.439秒付近で開始し、30秒後の`MODE Demo->Title(timeout)`まで完走した。
+  これはコールドブート時のウォッチドッグ異常なしを示す正式な確認列である。
+
+UF2Loader列の`=1`は、その列の起動前に発生したリセット理由を示す値であり、
+同列の実行中に再起動したことを示すものではない。電源OFF/ON列は`=0`で、両列とも
+タイトル表示、LCD・キーボード・SD初期化、Wave 4デモ開始、30秒デモ終了からTitleへの
+帰還を確認できた。この実機受入により、最終UF2のハードウェアゲートを完了とする。
 
 ## 公開工程
 
-この段階ではタグもGitHub Releaseも作成しない。実機受入記録が揃い、リポジトリを
-Publicへ変更した後に、同じUF2とSHA-256を添えて `v1.0.0` タグ／Releaseを作成する。
+この段階ではタグもGitHub Releaseも作成しない。実機受入記録は揃ったため、次は
+リポジトリをPublicへ変更した後に、同じUF2とSHA-256を添えて `v1.0.0` タグ／Releaseを
+作成する。
