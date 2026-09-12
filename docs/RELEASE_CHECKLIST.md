@@ -51,14 +51,14 @@ supported target until separately tested.
       in a persistent artifact directory; verify a SHA-256 manifest before any
       cleanup. An unclassified temporary file is not eligible for deletion.
 
-The current verification build is `0.9.18`. It is intentionally kept below
-`1.0.0` while diagnostics and emulator checks are run. The final `1.0.0`
-version bump is a one-time bookkeeping step immediately before the clean
-release build; no diagnostic or emulator-only changes are made under `1.0.0`.
+The current verification build is `1.0.0`. This is the final version-only
+release-preparation step; no game source behavior or diagnostic-only change is
+being made under `1.0.0`. The tag and GitHub Release remain pending until the
+final UF2 is tied to the target-hardware smoke record.
 
 ## Required before creating the v1.0.0 tag
 
-- [ ] Change `VERSION` and all current versioned release text to `1.0.0` as the
+- [x] Change `VERSION` and all current versioned release text to `1.0.0` as the
       final no-source-change release step.
 - [ ] Rebuild from the final tagged source with the documented SDK/toolchain,
       record size information and the UF2 SHA-256.

@@ -124,7 +124,8 @@ mkdir -p "$out/snapshots"
 `report.json` の `verdict.status` と `scenario.status` が `pass` であること、
 `exception`・`unsupported_mmio`・キーボードdropがないことを確認します。これは登録targetの
 正式回帰判定ではなく、新規BINの診断実行です。実行シナリオと保存済み結果は、最新の
-[`v0.9.18 検証ビルド記録`](docs/validation/2026-09-12-v0.9.18/BUILD.md)（以前の記録は
+[`v1.0.0 検証ビルド記録`](docs/validation/2026-09-12-v1.0.0/BUILD.md)（作業版の記録は
+[`v0.9.18 ビルド記録`](docs/validation/2026-09-12-v0.9.18/BUILD.md)、
 [`v0.9.17 ビルド記録`](docs/validation/2026-09-12-v0.9.17/BUILD.md)、
 [`v0.9.13 ビルド記録`](docs/validation/2026-09-12-v0.9.13/BUILD.md)、
 [`v0.9.12 ビルド記録`](docs/validation/2026-09-12-v0.9.12/BUILD.md)、
@@ -216,7 +217,7 @@ third_party/
 `VERSION` ファイルで管理（major.minor.patch）。ソース挙動が変わるビルドを
 PicoCalc向けソースを1行でも変更した場合は、内部診断・ビルド設定を含めて例外なく
 `VERSION`の数値を上げる。同じ版番号のUF2を複数配布しない。現在のバージョンは
-`0.9.18` で、タイトル画面の
+`1.0.0` で、タイトル画面の
 `VERSION` 表示と起動時UARTログに反映される。
 
 ## 注記

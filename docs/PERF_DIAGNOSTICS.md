@@ -87,11 +87,11 @@ cmake --build "$diag" -j2
    `event=boot` が再度出た場合は再起動なので、その窓は未完了として扱う。
 
 ```text
-PERF_DEMO event=boot schema=1 version=0.9.18 uptime_us=... watchdog_reboot=0
-PERF_DEMO event=start schema=1 version=0.9.18 session=1 boot_uptime_us=... watchdog_reboot=0 window_us=300000000 target_p95_us=33000
-PERF_DEMO event=session_end schema=1 version=0.9.18 session=1 uptime_us=... reason=Demo->Title(timeout)
-PERF_DEMO event=session_start schema=1 version=0.9.18 session=2 uptime_us=...
-PERF_DEMO event=done schema=1 version=0.9.18 boot_uptime_us=... watchdog_reboot=0 window_us=300000000 elapsed_us=... window_frames=... demo_frames=... non_demo_frames=... demo_sessions=... demo_resets=... min_us=... avg_us=... p95_upper_us=... max_us=... target_p95_us=33000 timing_within_target=... stack_bytes=4096 stack_used_bytes=... stack_free_bytes=... stack_first_dirty=... stack_fill_end=... stack_guard_bytes=256 stack_overflow=0
+PERF_DEMO event=boot schema=1 version=1.0.0 uptime_us=... watchdog_reboot=0
+PERF_DEMO event=start schema=1 version=1.0.0 session=1 boot_uptime_us=... watchdog_reboot=0 window_us=300000000 target_p95_us=33000
+PERF_DEMO event=session_end schema=1 version=1.0.0 session=1 uptime_us=... reason=Demo->Title(timeout)
+PERF_DEMO event=session_start schema=1 version=1.0.0 session=2 uptime_us=...
+PERF_DEMO event=done schema=1 version=1.0.0 boot_uptime_us=... watchdog_reboot=0 window_us=300000000 elapsed_us=... window_frames=... demo_frames=... non_demo_frames=... demo_sessions=... demo_resets=... min_us=... avg_us=... p95_upper_us=... max_us=... target_p95_us=33000 timing_within_target=... stack_bytes=4096 stack_used_bytes=... stack_free_bytes=... stack_first_dirty=... stack_fill_end=... stack_guard_bytes=256 stack_overflow=0
 ```
 
 行は空白区切りの `key=value` 形式なので、ログから `event=done` の行を抜き出して
