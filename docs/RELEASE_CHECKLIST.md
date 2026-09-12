@@ -30,7 +30,9 @@ supported target until separately tested.
       procedure and schema are in [`docs/PERF_DIAGNOSTICS.md`](PERF_DIAGNOSTICS.md).
       The diagnostic frame-time value is explicitly not used as the real-device
       33 ms performance verdict.
-- [x] RP2040 Release UF2 build; current artifact is in `build/`.
+- [x] RP2040 Release UF2 build; the final `1.0.0` artifact is in `build/`.
+      The exact size, SHA-256, source revision, and reproducible command are in
+      [`v1.0.0 BUILD.md`](validation/2026-09-12-v1.0.0/BUILD.md).
 - [x] Product UART boot identity is emitted as a flushed `PICO_SKYACE_BOOT`
       line with app/version/build/watchdog/clock/UART fields; the display
       initialization boundary repeats the app/version/build identity, and a
@@ -46,10 +48,12 @@ supported target until separately tested.
       specifications, and explains the resulting individual-unit/power/thermal
       caveat with a link to the official specification.
 
-- [ ] For every `/tmp`-based build or measurement, preserve the raw log, report,
+- [x] For every `/tmp`-based build or measurement, preserve the raw log, report,
       input/scenario, reproduction inputs, used BIN/UF2, and command/configuration
       in a persistent artifact directory; verify a SHA-256 manifest before any
-      cleanup. An unclassified temporary file is not eligible for deletion.
+      cleanup. The final `1.0.0` build and emulator run used persistent project
+      paths rather than `/tmp`; the earlier temporary emulator attempt is retained
+      under `build-artifacts/2026-09-12-v0.9.18/`.
 
 The current verification build is `1.0.0`. This is the final version-only
 release-preparation step; no game source behavior or diagnostic-only change is
@@ -60,8 +64,18 @@ final UF2 is tied to the target-hardware smoke record.
 
 - [x] Change `VERSION` and all current versioned release text to `1.0.0` as the
       final no-source-change release step.
-- [ ] Rebuild from the final tagged source with the documented SDK/toolchain,
-      record size information and the UF2 SHA-256.
+- [x] Rebuild from the final release-preparation source with the documented
+      SDK/toolchain, record size information and the UF2 SHA-256. The clean
+      `83/83`-target Release build, host test `1/1`, build ID
+      `2026-09-12T08:24:02Z`, UF2 SHA-256
+      `de9dd26802ebf2e3428ea22241d1fe87cd8d892c4a29264c6a9e12de923e6913`, and
+      all artifact sizes are recorded in
+      [`v1.0.0 BUILD.md`](validation/2026-09-12-v1.0.0/BUILD.md).
+- [x] Run the final `1.0.0` BIN through the title/version emulator smoke with
+      the official LCD, keyboard, and FAT32 SD models. All five steps passed;
+      there was no exception, unsupported MMIO, LCD pixel drop, or orphan data
+      byte. The report, UART, screenshot, and manifest are retained under
+      [`build-artifacts/2026-09-12-v1.0.0/emulator-title/`](../build-artifacts/2026-09-12-v1.0.0/emulator-title/).
 - [x] Run the production binary (without shortened demo timing) through the
       complete title/demo/title and game-over/title UART scenarios; archived
       reports are in

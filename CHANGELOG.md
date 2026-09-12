@@ -14,7 +14,8 @@ claimed until the production build and the target-hardware gate are complete.
 
 - Final version-only release-preparation build. Game behavior is unchanged from
   v0.9.18; the version, final build artifacts, and their verification record
-  are being fixed before the public tag and GitHub Release.
+  are fixed before the public tag and GitHub Release. The final UF2 still needs
+  a short target-hardware smoke record before it can be tagged.
 
 - Documented that the product config runs RP2040 at 250 MHz for LCD timing,
   above the 133 MHz limit stated in Raspberry Pi's RP2040 specifications, and
