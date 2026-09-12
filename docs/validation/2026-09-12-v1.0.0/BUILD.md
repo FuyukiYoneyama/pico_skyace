@@ -99,6 +99,8 @@ UF2Loader列の`=1`は、その列の起動前に発生したリセット理由�
 
 ## 公開工程
 
-この段階ではタグもGitHub Releaseも作成しない。実機受入記録は揃ったため、次は
-リポジトリをPublicへ変更した後に、同じUF2とSHA-256を添えて `v1.0.0` タグ／Releaseを
-作成する。
+実機受入記録を確認後、リポジトリをPublicへ変更し、`v1.0.0`タグとGitHub Releaseを
+作成した。Releaseは2026-09-12T08:49:04Zに公開され、URLは
+<https://github.com/FuyukiYoneyama/pico_skyace/releases/tag/v1.0.0>。
+添付した `pico_skyace.uf2` は本記録のSHA-256
+`de9dd26802ebf2e3428ea22241d1fe87cd8d892c4a29264c6a9e12de923e6913`と一致する。

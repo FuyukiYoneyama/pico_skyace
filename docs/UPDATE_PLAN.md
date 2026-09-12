@@ -66,8 +66,12 @@ LCD画素dropなしだった。残りは、このUF2を実機へ書き込み、�
 だった。`20260912_173039.log`（UF2Loader起動＋電源OFF/ON起動、SHA-256
 `38455a14e43b762d8306298061be312b787371acd7c99c2fa4269e8c5b8a3bca`）で両経路の
 Title→Wave 4 Demo→Titleを確認し、電源OFF/ON列の`WATCHDOG_CAUSED_REBOOT=0`も確認済みである。
-実機ゲートは完了したため、残りはリポジトリをPublicへ変更した後のタグ／GitHub Release作成だけである。
-同じUF2とSHA-256を添付し、それまではタグを作成しない。
+実機ゲート完了後、リポジトリをPublicへ変更し、同じUF2とSHA-256を添付した
+`v1.0.0`タグ／GitHub Releaseを作成した。Release URLは
+<https://github.com/FuyukiYoneyama/pico_skyace/releases/tag/v1.0.0>で、公開済みUF2の
+SHA-256は`de9dd26802ebf2e3428ea22241d1fe87cd8d892c4a29264c6a9e12de923e6913`である。
+これによりレビューで定めた公開前ゲートはすべて完了した。今後ソースを変更する場合は
+`VERSION`を更新し、新しい検証ビルドとして扱う。
 直前は [v0.9.13 ハイスコア・README画像更新ビルド記録](validation/2026-09-12-v0.9.13/BUILD.md)。
 直前は [v0.9.12 ミサイル発射位置・README構成調整ビルド記録](validation/2026-09-12-v0.9.12/BUILD.md)。
 直前のミサイル発射位置・機銃トレーサ調整は [v0.9.11ビルド記録](validation/2026-09-12-v0.9.11/BUILD.md)。

@@ -6,10 +6,7 @@ UF2 asset.
 
 ## [Unreleased]
 
-The v1.0.0 build and target-hardware verification are complete. This entry
-remains until the repository is Public and the versioned tag and GitHub Release
-are created; the release asset must use the verified UF2 and SHA-256 recorded in
-[`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md).
+No unreleased changes are currently recorded.
 
 ## [1.0.0] - 2026-09-12
 

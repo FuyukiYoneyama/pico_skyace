@@ -140,9 +140,12 @@ Public.
       recorded as the current hardware baseline; no 30 fps claim is made.
 - [x] README gameplay image was replaced with the supplied combat capture; a
       final-firmware capture may replace it again for the v1.0.0 release page.
-- [ ] Create the `v1.0.0` Git tag and GitHub Release, attaching the UF2 and its
-      checksum alongside `CHANGELOG.md`, `NOTICE.md`, and the supported-target
-      notes.
+- [x] Create the `v1.0.0` Git tag and GitHub Release, attaching the verified UF2
+      and its checksum alongside `CHANGELOG.md`, `NOTICE.md`, and the
+      supported-target notes. The repository was made Public first; the Release
+      is [published here](https://github.com/FuyukiYoneyama/pico_skyace/releases/tag/v1.0.0)
+      with the final UF2 SHA-256
+      `de9dd26802ebf2e3428ea22241d1fe87cd8d892c4a29264c6a9e12de923e6913`.
 
 ## Stop conditions
 
