@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "name": "pico-skyace-perf-diagnostic-product",
-  "description": "Diagnostic-only five-minute Demo frame-time and stack high-water log. The firmware is built with PICO_SKYACE_PERF_DIAGNOSTICS and is not the product build.",
+  "name": "pico-skyace-perf-demo-log-smoke",
+  "description": "Diagnostic-only smoke check for the machine-readable five-minute demo performance log.",
   "poll_ms": 10,
   "steps": [
     {
@@ -18,15 +18,15 @@
     },
     {
       "op": "wait_until",
-      "label": "Demo performance window starts",
+      "label": "demo performance window starts",
       "condition": {"kind": "uart_contains", "text": "PERF_DEMO event=start"},
-      "timeout_ms": 60000
+      "timeout_ms": 10000
     },
     {
       "op": "wait_until",
-      "label": "diagnostic Demo frame and stack report",
+      "label": "demo performance window completes",
       "condition": {"kind": "uart_contains", "text": "PERF_DEMO event=done"},
-      "timeout_ms": 360000
+      "timeout_ms": 30000
     },
     {"op": "wait", "ms": 100}
   ]

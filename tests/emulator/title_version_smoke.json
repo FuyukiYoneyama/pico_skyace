@@ -7,7 +7,7 @@
     {
       "op": "wait_until",
       "label": "firmware initialized",
-      "condition": {"kind": "uart_contains", "text": "pico_skyace version 0.9.14"},
+      "condition": {"kind": "uart_contains", "text": "pico_skyace version 0.9.16"},
       "timeout_ms": 3000
     },
     {

@@ -14,6 +14,14 @@ project(pico_skyace C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
+# 実機のデモ性能を無人で集計する診断ビルド。既定OFFで、製品バイナリには
+# 計測コードを含めない。実機計測時だけONにし、必要なら短い値でエミュレーター
+# のシナリオを回す。
+option(PICO_SKYACE_PERF_DIAGNOSTICS
+       "Enable demo frame-time and stack high-water UART diagnostics" OFF)
+set(PICO_SKYACE_PERF_WINDOW_MS 300000 CACHE STRING
+    "Diagnostic demo measurement window in milliseconds")
+
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/VERSION
 )
@@ -63,6 +71,13 @@ target_compile_definitions(pico_skyace PRIVATE
     PICO_DEFAULT_UART_BAUD_RATE=115200
     PICO_STACK_SIZE=0x1000
 )
+
+if(PICO_SKYACE_PERF_DIAGNOSTICS)
+    target_compile_definitions(pico_skyace PRIVATE
+        PICO_SKYACE_PERF_DIAGNOSTICS=1
+        PICO_SKYACE_PERF_WINDOW_MS=${PICO_SKYACE_PERF_WINDOW_MS}
+    )
+endif()
 
 target_link_libraries(pico_skyace
     pico_stdlib

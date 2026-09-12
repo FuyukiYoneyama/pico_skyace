@@ -25,6 +25,9 @@ supported target until separately tested.
 - [x] Product ELF Flash/RAM size and a non-hardware diagnostic stack high-water
       sample are recorded under
       [`build-artifacts/2026-09-10-nonhardware/perf-diagnostic/`](../build-artifacts/2026-09-10-nonhardware/perf-diagnostic/).
+      A diagnostic-only five-minute Demo logger now emits machine-readable
+      `PERF_DEMO` boot/session boundary lines and one `event=done` line; its
+      procedure and schema are in [`docs/PERF_DIAGNOSTICS.md`](PERF_DIAGNOSTICS.md).
       The diagnostic frame-time value is explicitly not used as the real-device
       33 ms performance verdict.
 - [x] RP2040 Release UF2 build; current artifact is in `build/`.
@@ -33,9 +36,20 @@ supported target until separately tested.
 - [x] Production-timing emulator scenarios are now checked in for the complete
       title/demo cycle and game-over timeout (`tests/emulator/`).
 
+- [ ] For every `/tmp`-based build or measurement, preserve the raw log, report,
+      input/scenario, reproduction inputs, used BIN/UF2, and command/configuration
+      in a persistent artifact directory; verify a SHA-256 manifest before any
+      cleanup. An unclassified temporary file is not eligible for deletion.
+
+The current verification build is `0.9.16`. It is intentionally kept below
+`1.0.0` while diagnostics and emulator checks are run. The final `1.0.0`
+version bump is a one-time bookkeeping step immediately before the clean
+release build; no diagnostic or emulator-only changes are made under `1.0.0`.
+
 ## Required before creating the v1.0.0 tag
 
-- [ ] Change `VERSION` and all versioned release text to `1.0.0`.
+- [ ] Change `VERSION` and all current versioned release text to `1.0.0` as the
+      final no-source-change release step.
 - [ ] Rebuild from the final tagged source with the documented SDK/toolchain,
       record size information and the UF2 SHA-256.
 - [x] Run the production binary (without shortened demo timing) through the
@@ -63,21 +77,28 @@ supported target until separately tested.
       GameOver->Title, SD-present/absent F5 handling, and power-cycle recovery
       all passed. This is a manual report; the UF2 hash, photos/UART capture,
       and exact test timestamp were not supplied.
-- [ ] Verify the final UF2 on an actual standard RP2040 PicoCalc: cold boot,
-      LCD, keyboard, simultaneous input, BGM/SFX/engine audio, SD screenshot
-      success and no-card recovery, and power-cycle recovery. Repeat the smoke
-      test above after the deferred 1.0.0 final build; the current v0.9.4
-      development build still requires a fresh hardware check for the revised
-      Wave aggression, Wave 4 demo start, and sun color.
+- [x] User-reported hardware smoke test of the current build on an actual
+      standard RP2040 PicoCalc passed: cold boot, LCD, keyboard, simultaneous
+      input, BGM/SFX/engine audio, SD save/no-card recovery, power-cycle
+      recovery, revised Wave aggression, Wave 4 demo start, and sun color.
+      The reported UF2 version, SHA-256, and exact test timestamp were not
+      supplied; before tagging `1.0.0`, associate this acceptance with the final
+      UF2 (or repeat the smoke test after the final build).
 - [x] User-reported 20-minute upper-load play run completed without issue on
       2026-09-10. This is a manual stability-acceptance record; the tested
       UF2 hash, UART log, and exact run metadata were not supplied.
-- [ ] Record frame-time and memory evidence on the target hardware; the plan's
-      provisional target is a 33 ms 95th-percentile frame, with runtime stack
-      headroom recorded alongside Flash/RAM usage. The separate two-minute
-      production-BIN stability sample and non-hardware diagnostic p95/stack
-      sample do not prove the real LCD-transfer frame time. Repeat this gate
-      after the deferred 1.0.0 final build.
+- [x] Record frame-time and memory evidence on the target hardware. The
+      v0.9.15 diagnostic log `20260912_135758.log` completed its 300-second
+      window from one boot: Demo p95 upper bound `64.999 ms`, average
+      `60.409 ms`, maximum `64.621 ms`, stack `1208/4096 bytes`, free `2888
+      bytes`, and `stack_overflow=0`. The boot record reports
+      `version=0.9.15 watchdog_reboot=0`; `demo_resets=0` and the single
+      `event=done` establish a complete window. Additional boot records appear
+      only after `event=done` and are outside this measurement. The provisional
+      33 ms target is not met, but it is not a v1.0 functional requirement: at
+      the stable 31.25 MHz link, sending a full 320x320 RGB565 frame has a
+      52.4 ms wire-time floor before software overhead. The measured value is
+      recorded as the current hardware baseline; no 30 fps claim is made.
 - [x] README gameplay image was replaced with the supplied combat capture; a
       final-firmware capture may replace it again for the v1.0.0 release page.
 - [ ] Create the `v1.0.0` Git tag and GitHub Release, attaching the UF2 and its

@@ -261,6 +261,258 @@ uint64_t g_title_deadline_us = 0;
 uint64_t g_demo_deadline_us = 0;
 uint64_t g_gameover_deadline_us = 0;
 
+#if defined(PICO_SKYACE_PERF_DIAGNOSTICS)
+#ifndef PICO_SKYACE_PERF_WINDOW_MS
+#define PICO_SKYACE_PERF_WINDOW_MS 300000u
+#endif
+
+// 診断ビルドだけで、最初のDemo開始から5分間（またはビルド時指定値）を
+// 集計する。タイトルへ戻る30秒境界は製品仕様のまま維持し、Demo中の
+// フレームだけをp95の母集団にするため、5分放置でUARTへ一行を出せる。
+constexpr uint64_t kPerfDemoWindowUs =
+    static_cast<uint64_t>(PICO_SKYACE_PERF_WINDOW_MS) * 1000u;
+constexpr uint32_t kPerfTargetFrameUs = 33000u;
+constexpr uint32_t kPerfBinWidthUs = 1000u;
+constexpr uint32_t kPerfBinCount = 1001u;  // 最後は1秒以上の上限ビン
+constexpr uint32_t kPerfStackPattern = 0xa5a5a5a5u;
+constexpr uintptr_t kPerfStackGuardBytes = 256u;
+
+struct PerfDiagnostics {
+    bool started = false;
+    bool reported = false;
+    bool watchdog_reboot = false;
+    uint64_t boot_uptime_us = 0;
+    uint64_t window_start_us = 0;
+    uint64_t window_deadline_us = 0;
+    uint64_t total_us = 0;
+    uint32_t window_frames = 0;
+    uint32_t demo_frames = 0;
+    uint32_t non_demo_frames = 0;
+    uint32_t demo_sessions = 0;
+    uint32_t demo_resets = 0;
+    uint32_t min_us = 0xffffffffu;
+    uint32_t max_us = 0;
+    uint16_t bins[kPerfBinCount] = {};
+};
+
+PerfDiagnostics g_perf{};
+uintptr_t g_perf_stack_fill_end = 0;
+
+extern "C" uint8_t __StackBottom;
+extern "C" uint8_t __StackTop;
+
+uintptr_t perf_read_stack_pointer() {
+    uintptr_t value = 0;
+    asm volatile("mov %0, sp" : "=r"(value));
+    return value;
+}
+
+void perf_prepare_stack() {
+    const uintptr_t bottom = reinterpret_cast<uintptr_t>(&__StackBottom);
+    const uintptr_t top = reinterpret_cast<uintptr_t>(&__StackTop);
+    const uintptr_t sp = perf_read_stack_pointer();
+    uintptr_t fill_end = sp > bottom + kPerfStackGuardBytes
+                             ? sp - kPerfStackGuardBytes
+                             : bottom;
+    if (fill_end > top) {
+        fill_end = top;
+    }
+    fill_end &= ~static_cast<uintptr_t>(3);
+    for (uintptr_t address = bottom; address < fill_end;
+         address += sizeof(uint32_t)) {
+        *reinterpret_cast<volatile uint32_t*>(address) = kPerfStackPattern;
+    }
+    g_perf_stack_fill_end = fill_end;
+}
+
+void perf_read_stack(uint32_t* used_bytes, uint32_t* free_bytes,
+                     uint32_t* stack_bytes, uint32_t* first_dirty,
+                     bool* overflow) {
+    const uintptr_t bottom = reinterpret_cast<uintptr_t>(&__StackBottom);
+    const uintptr_t top = reinterpret_cast<uintptr_t>(&__StackTop);
+    uintptr_t dirty = bottom;
+    while (dirty + sizeof(uint32_t) <= g_perf_stack_fill_end &&
+           *reinterpret_cast<volatile const uint32_t*>(dirty) ==
+               kPerfStackPattern) {
+        dirty += sizeof(uint32_t);
+    }
+    *used_bytes = dirty < top ? static_cast<uint32_t>(top - dirty) : 0u;
+    *free_bytes = dirty > bottom ? static_cast<uint32_t>(dirty - bottom) : 0u;
+    *stack_bytes = static_cast<uint32_t>(top - bottom);
+    *first_dirty = static_cast<uint32_t>(dirty);
+    *overflow = dirty <= bottom;
+}
+
+uint32_t perf_p95_upper_us() {
+    if (g_perf.demo_frames == 0) {
+        return 0;
+    }
+    const uint32_t rank = (g_perf.demo_frames * 95u + 99u) / 100u;
+    uint32_t cumulative = 0;
+    uint32_t p95_bin = kPerfBinCount - 1u;
+    for (uint32_t i = 0; i < kPerfBinCount; ++i) {
+        cumulative += g_perf.bins[i];
+        if (cumulative >= rank) {
+            p95_bin = i;
+            break;
+        }
+    }
+    if (p95_bin == kPerfBinCount - 1u) {
+        return 0xffffffffu;
+    }
+    return (p95_bin + 1u) * kPerfBinWidthUs - 1u;
+}
+
+void perf_log_boot() {
+    const uint64_t uptime_us = time_us_64();
+    std::printf(
+        "PERF_DEMO event=boot schema=1 version=%s uptime_us=%llu "
+        "watchdog_reboot=%d\r\n",
+        PICO_SKYACE_VERSION_STRING,
+        static_cast<unsigned long long>(uptime_us),
+        watchdog_caused_reboot() ? 1 : 0);
+}
+
+void perf_note_demo_enter() {
+    if (g_perf.reported) {
+        return;
+    }
+    const uint64_t uptime_us = time_us_64();
+    if (!g_perf.started) {
+        g_perf.started = true;
+        g_perf.boot_uptime_us = uptime_us;
+        g_perf.watchdog_reboot = watchdog_caused_reboot();
+        g_perf.demo_sessions = 1;
+        g_perf.window_start_us = uptime_us;
+        g_perf.window_deadline_us = g_perf.window_start_us + kPerfDemoWindowUs;
+        std::printf(
+            "PERF_DEMO event=start schema=1 version=%s session=1 "
+            "boot_uptime_us=%llu watchdog_reboot=%d window_us=%lu "
+            "target_p95_us=%lu\r\n",
+            PICO_SKYACE_VERSION_STRING,
+            static_cast<unsigned long long>(g_perf.boot_uptime_us),
+            g_perf.watchdog_reboot ? 1 : 0,
+            static_cast<unsigned long>(kPerfDemoWindowUs),
+            static_cast<unsigned long>(kPerfTargetFrameUs));
+        return;
+    }
+    ++g_perf.demo_sessions;
+    std::printf(
+        "PERF_DEMO event=session_start schema=1 version=%s session=%lu "
+        "uptime_us=%llu\r\n",
+        PICO_SKYACE_VERSION_STRING,
+        static_cast<unsigned long>(g_perf.demo_sessions),
+        static_cast<unsigned long long>(uptime_us));
+}
+
+void perf_note_demo_exit(const char* transition) {
+    if (!g_perf.started || g_perf.reported) {
+        return;
+    }
+    std::printf(
+        "PERF_DEMO event=session_end schema=1 version=%s session=%lu "
+        "uptime_us=%llu reason=%s\r\n",
+        PICO_SKYACE_VERSION_STRING,
+        static_cast<unsigned long>(g_perf.demo_sessions),
+        static_cast<unsigned long long>(time_us_64()), transition);
+}
+
+void perf_note_demo_reset() {
+    if (g_perf.started && !g_perf.reported) {
+        ++g_perf.demo_resets;
+    }
+}
+
+void perf_report() {
+    if (!g_perf.started || g_perf.reported) {
+        return;
+    }
+    uint32_t stack_used = 0;
+    uint32_t stack_free = 0;
+    uint32_t stack_bytes = 0;
+    uint32_t first_dirty = 0;
+    bool stack_overflow = false;
+    perf_read_stack(&stack_used, &stack_free, &stack_bytes, &first_dirty,
+                    &stack_overflow);
+
+    const uint32_t p95_upper = perf_p95_upper_us();
+    const uint32_t average = g_perf.demo_frames == 0
+                                 ? 0u
+                                 : static_cast<uint32_t>(
+                                       g_perf.total_us / g_perf.demo_frames);
+    const uint64_t elapsed_us = time_us_64() - g_perf.window_start_us;
+    const bool timing_within_target =
+        g_perf.demo_frames > 0 && p95_upper <= kPerfTargetFrameUs;
+    std::printf(
+        "PERF_DEMO event=done schema=1 version=%s boot_uptime_us=%llu "
+        "watchdog_reboot=%d window_us=%lu "
+        "elapsed_us=%llu window_frames=%lu demo_frames=%lu "
+        "non_demo_frames=%lu demo_sessions=%lu demo_resets=%lu "
+        "min_us=%lu avg_us=%lu p95_upper_us=%lu max_us=%lu "
+        "target_p95_us=%lu timing_within_target=%d "
+        "stack_bytes=%lu stack_used_bytes=%lu stack_free_bytes=%lu "
+        "stack_first_dirty=0x%08lx stack_fill_end=0x%08lx "
+        "stack_guard_bytes=%lu stack_overflow=%d\r\n",
+        PICO_SKYACE_VERSION_STRING,
+        static_cast<unsigned long long>(g_perf.boot_uptime_us),
+        g_perf.watchdog_reboot ? 1 : 0,
+        static_cast<unsigned long>(kPerfDemoWindowUs),
+        static_cast<unsigned long long>(elapsed_us),
+        static_cast<unsigned long>(g_perf.window_frames),
+        static_cast<unsigned long>(g_perf.demo_frames),
+        static_cast<unsigned long>(g_perf.non_demo_frames),
+        static_cast<unsigned long>(g_perf.demo_sessions),
+        static_cast<unsigned long>(g_perf.demo_resets),
+        static_cast<unsigned long>(g_perf.demo_frames == 0 ? 0u : g_perf.min_us),
+        static_cast<unsigned long>(average),
+        static_cast<unsigned long>(p95_upper),
+        static_cast<unsigned long>(g_perf.demo_frames == 0 ? 0u : g_perf.max_us),
+        static_cast<unsigned long>(kPerfTargetFrameUs),
+        timing_within_target ? 1 : 0,
+        static_cast<unsigned long>(stack_bytes),
+        static_cast<unsigned long>(stack_used),
+        static_cast<unsigned long>(stack_free),
+        static_cast<unsigned long>(first_dirty),
+        static_cast<unsigned long>(g_perf_stack_fill_end),
+        static_cast<unsigned long>(kPerfStackGuardBytes),
+        stack_overflow ? 1 : 0);
+    g_perf.reported = true;
+}
+
+void perf_record_frame(uint64_t frame_start_us, bool demo_frame) {
+    if (!g_perf.started || g_perf.reported ||
+        frame_start_us < g_perf.window_start_us) {
+        return;
+    }
+    ++g_perf.window_frames;
+    if (demo_frame) {
+        ++g_perf.demo_frames;
+        const uint64_t elapsed64 = time_us_64() - frame_start_us;
+        const uint32_t elapsed = elapsed64 > 0xffffffffu
+                                     ? 0xffffffffu
+                                     : static_cast<uint32_t>(elapsed64);
+        g_perf.total_us += elapsed;
+        if (elapsed < g_perf.min_us) {
+            g_perf.min_us = elapsed;
+        }
+        if (elapsed > g_perf.max_us) {
+            g_perf.max_us = elapsed;
+        }
+        uint32_t bin = elapsed / kPerfBinWidthUs;
+        if (bin >= kPerfBinCount) {
+            bin = kPerfBinCount - 1u;
+        }
+        ++g_perf.bins[bin];
+    } else {
+        ++g_perf.non_demo_frames;
+    }
+
+    if (time_us_64() >= g_perf.window_deadline_us) {
+        perf_report();
+    }
+}
+#endif
+
 // 描画用（フレーム毎に計算）
 int g_hy = 80;            // 地平線の中心 y
 int32_t g_slope_q8 = 0;   // 地平線の傾き
@@ -857,12 +1109,20 @@ void enter_demo() {
     // 継続し、攻撃の効果音だけを抑制する。
     audio::set_engine(0);
     g_in.block_held();
+#if defined(PICO_SKYACE_PERF_DIAGNOSTICS)
+    perf_note_demo_enter();
+#endif
     std::printf("MODE Title->Demo frame=%lu time_us=%lu\r\n",
                 static_cast<unsigned long>(g_frame),
                 static_cast<unsigned long>(time_us_64()));
 }
 
 void enter_title(const char* transition) {
+#if defined(PICO_SKYACE_PERF_DIAGNOSTICS)
+    if (g_mode == Mode::Demo) {
+        perf_note_demo_exit(transition);
+    }
+#endif
     g_demo_mode = false;
     g_mode = Mode::Title;
     g_demo_timer = 0;
@@ -890,6 +1150,9 @@ void finalize_gameover() {
         // reset_game()/start_wave()を使って次の出撃を始め、デモ時間だけを
         // 継続する。敵AI・衝突・被弾の判定自体は実プレイと同じである。
         const DeathReason reason = g_death_reason;
+#if defined(PICO_SKYACE_PERF_DIAGNOSTICS)
+        perf_note_demo_reset();
+#endif
         std::printf("DEMO RESET frame=%lu reason=%d\r\n",
                     static_cast<unsigned long>(g_frame),
                     static_cast<int>(reason));
@@ -2738,8 +3001,19 @@ void run() {
     g_demo_deadline_us = 0;
     g_gameover_deadline_us = 0;
 
+#if defined(PICO_SKYACE_PERF_DIAGNOSTICS)
+    perf_prepare_stack();
+    // 初期化完了後にも起動状態を出す。起動直後のmain()ログをロガーが
+    // 取り逃しても、診断ログだけでその起動を識別できるようにする。
+    perf_log_boot();
+#endif
+
     absolute_time_t next_frame = make_timeout_time_ms(kFrameMs);
     while (true) {
+#if defined(PICO_SKYACE_PERF_DIAGNOSTICS)
+        const uint64_t perf_frame_start_us = time_us_64();
+        const bool perf_frame_started_in_demo = g_mode == Mode::Demo;
+#endif
         // フリーズ検知用ウォッチドッグ。
         watchdog_update();
 
@@ -2849,6 +3123,15 @@ void run() {
 
         display::present_scaled2x(gfx::fb());
         ++g_frame;
+
+#if defined(PICO_SKYACE_PERF_DIAGNOSTICS)
+        // Demoからタイトルへ切り替わった締切フレームはDemoの描画をして
+        // いないため除外する。タイトル滞在フレームはwindow_framesへ数え、
+        // p95はDemoだけの母集団に固定する。
+        const bool perf_demo_frame_completed =
+            perf_frame_started_in_demo && g_mode == Mode::Demo;
+        perf_record_frame(perf_frame_start_us, perf_demo_frame_completed);
+#endif
 
         sleep_until(next_frame);
         next_frame = delayed_by_ms(next_frame, kFrameMs);

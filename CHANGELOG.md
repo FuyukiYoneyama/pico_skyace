@@ -10,6 +10,21 @@ Release preparation for v1.0.0 is tracked in
 [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md). No v1.0.0 firmware is
 claimed until the production build and the target-hardware gate are complete.
 
+## [0.9.16] - 2026-09-12
+
+- Release-preparation verification build for the standard RP2040 PicoCalc
+  target. It keeps the complete title/play/pause/game-over/demo flow, Wave
+  combat, finite weapons, directional warnings, high scores, SD screenshots,
+  and the audio system from v0.9.15.
+- Diagnostics and emulator evidence are recorded before the final `1.0.0`
+  version-only release step. This build is not the public release tag.
+
+## [0.9.15] - 2026-09-12
+
+- Versioned the PicoCalc source changes for diagnostic boot and Demo-session
+  logging as a new firmware revision. The rebuilt diagnostic UF2 must report
+  `version=0.9.15`; older 0.9.14 UF2 files are not interchangeable.
+
 ## [0.9.14] - 2026-09-12
 
 - Moved the high-score display to the top row of both the title and game-over
