@@ -5,8 +5,12 @@
 - Source file: `src/game/bgm_track.h`
 - Runtime format: deterministic note and drum tables; the firmware does not
   parse a MIDI file or load an audio sample
-- Uses: title, game-over, and demo music
-- Current arrangement length: 102.7 seconds before looping
+- Uses: title and demo music, plus a separate game-over music loop
+- Current arrangements: title/demo 102.7 seconds; game-over 8 seconds
+
+The title arrangement is kept running through the demo. Game-over switches to
+the separate 8-second descending arrangement, which loops while the result
+screen is shown; returning to the title switches back to the title arrangement.
 
 ## Origin
 

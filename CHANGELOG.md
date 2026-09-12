@@ -10,6 +10,69 @@ Release preparation for v1.0.0 is tracked in
 [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md). No v1.0.0 firmware is
 claimed until the production build and the target-hardware gate are complete.
 
+## [0.9.14] - 2026-09-12
+
+- Moved the high-score display to the top row of both the title and game-over
+  screens so it remains visible without covering the gameplay/title art.
+
+## [0.9.13] - 2026-09-12
+
+- Added a high-score display to the title and game-over screens.
+- Persisted new records in two checksummed SD-card slots so a failed or
+  interrupted update cannot erase the other copy.
+- Kept the session score when an SD card is absent or a write fails, so storage
+  problems never block a new sortie.
+- Replaced the README gameplay image with the supplied in-game combat capture.
+
+## [0.9.12] - 2026-09-12
+
+- Tightened the underwing missile launch offset so the missiles appear close to
+  the wing rails instead of far out to the sides.
+- Reordered the README so player instructions come first; moved the fan-made
+  rights note to a marked note near the licensing section and placed technical
+  specifications later.
+
+## [0.9.11] - 2026-09-12
+
+- Changed missile launch visuals to originate from underwing pylons, alternating
+  left and right on each successful launch.
+- Simplified the GUN tracer to one line from the aircraft nose.
+
+## [0.9.10] - 2026-09-12
+
+- Added a bright alternating flash to the player aircraft when taking damage.
+- Coupled speed to vertical flight: climbing applies drag and descending adds
+  speed, while level flight retains its existing throttle behavior.
+
+## [0.9.9] - 2026-09-12
+
+- Delayed the `WAVE CLEAR` screen until the final enemy's explosion animation
+  has fully finished, so the celebration follows the visible defeat.
+
+## [0.9.8] - 2026-09-12
+
+- Retuned the approach warning so it only sounds while an enemy is closing in
+  within the near-range approach band, instead of immediately when the Wave
+  enters its aggressive phase at a distant position.
+
+## [0.9.7] - 2026-09-12
+
+- Reorganized the lower HUD: GUN and missiles now share the bottom row on the
+  left and right, HP moves above the missile count, and the radar is shifted up
+  to keep the weapon row clear.
+
+## [0.9.6] - 2026-09-12
+
+- Cleared explosions, missiles, and target-lock state at the Wave boundary so
+  defeated enemies from the previous Wave cannot remain visible when the next
+  Wave starts.
+
+## [0.9.5] - 2026-09-12
+
+- Added a dedicated looping game-over BGM with a descending minor-key melody,
+  sustained harmony, low bass, and sparse heartbeat-like drums. The title and
+  demo continue to use the title track, and returning to the title restores it.
+
 ## [0.9.4] - 2026-09-12
 
 - Increased enemy pressure by Wave: later enemies pursue sooner, turn faster,

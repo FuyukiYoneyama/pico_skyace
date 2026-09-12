@@ -1,11 +1,12 @@
 #ifndef PICO_SKYACE_GAME_BGM_TRACK_H_
 #define PICO_SKYACE_GAME_BGM_TRACK_H_
 
+#include <cstddef>
 #include <cstdint>
 
 #include "platform/picocalc_audio.h"
 
-// Sky Ace メインBGM。ChatGPT（OpenAI）に生成させた、初代エースコンバット風の
+// Sky Ace BGM。ChatGPT（OpenAI）に生成させた、初代エースコンバット風の
 // 雰囲気を意図したオリジナル曲（ace_combat_1_inspired_original.mid）から、
 // ビルド前にトラック別へ変換して同梱したもの（実行時に MIDI はパースしない
 // 方針）。既存ゲームの楽曲データの複製・採譜ではなく、特定の著作物からの
@@ -20,8 +21,9 @@
 //   kDrumNotes  : Drums トラック（GM ノートをキック/スネア/ハット/
 //                 クラッシュ/タムの5種の合成ドラムへ写像。同時打点は
 //                 優先度 クラッシュ>キック>スネア>タム>ハット で1つに）
-//   kTitleDrumNotes: タイトル／ゲームオーバー用の短いキック・スネア・
-//                    ハット・タム・クラッシュのメニュー・グルーヴ
+//   kTitleDrumNotes: タイトル／デモ用の短いキック・スネア・ハット・
+//                    タム・クラッシュのメニュー・グルーヴ
+//   kGameOver*     : ゲームオーバー専用の下降メロディーと低い鼓動系リズム
 // Strings Pad トラックはチャンネル数の都合で未使用。
 // 全チャンネルの合計時間は末尾休符で完全一致させてあり、ループ再生でも
 // チャンネル間がずれない。freq_hz=0 / type=0 は休符。
@@ -29,6 +31,9 @@ namespace skyace::game::bgm {
 
 using skyace::audio::DrumNote;
 using skyace::audio::MusicNote;
+using skyace::audio::kDrumKick;
+using skyace::audio::kDrumRest;
+using skyace::audio::kDrumTom;
 
 // リード／アルペジオ／コード／ベースの各トラックが共有する1曲分の長さ。
 // タイトル曲の再生時間を表示・検証するときの基準値。タイトルからデモへの
@@ -706,7 +711,7 @@ inline const MusicNote kBassNotes[] = {
 };
 constexpr int kBassNotesCount = sizeof(kBassNotes) / sizeof(kBassNotes[0]);
 
-// タイトル／ゲームオーバー用の締まったメニュー・グルーヴ。
+// タイトル／デモ用の締まったメニュー・グルーヴ。
 // 200msの基本打点に、末尾だけ100msのキック／タム・フィルを入れる。
 // 3.2秒ループでアルペジオの刻みとも揃う。
 inline constexpr DrumNote kTitleDrumNotes[] = {
@@ -718,6 +723,80 @@ inline constexpr DrumNote kTitleDrumNotes[] = {
 };
 constexpr int kTitleDrumNotesCount =
     sizeof(kTitleDrumNotes) / sizeof(kTitleDrumNotes[0]);
+
+// ゲームオーバー用の8秒ループ。タイトル曲と明確に区別できるよう、
+// Aマイナー系の下降メロディー、長い和音、低いベース、疎なキック／タムにする。
+// 全トラックの合計時間を8,000msに揃え、10秒の結果表示中も途切れずに再生する。
+constexpr uint32_t kGameOverMusicDurationMs = 8000;
+
+inline constexpr MusicNote kGameOverLeadNotes[] = {
+    {220, 500}, {196, 500}, {175, 500}, {165, 500},
+    {147, 500}, {131, 500}, {123, 500}, {110, 500},
+    {0, 500},   {110, 500}, {98, 500},  {82, 500},
+    {73, 500},  {65, 500},  {0, 500},   {0, 500},
+};
+constexpr int kGameOverLeadNotesCount =
+    sizeof(kGameOverLeadNotes) / sizeof(kGameOverLeadNotes[0]);
+
+inline constexpr MusicNote kGameOverArpNotes[] = {
+    {110, 250}, {131, 250}, {165, 250}, {131, 250},
+    {87, 250},  {110, 250}, {131, 250}, {110, 250},
+    {73, 250},  {87, 250},  {110, 250}, {87, 250},
+    {82, 250},  {98, 250},  {123, 250}, {98, 250},
+    {110, 250}, {131, 250}, {165, 250}, {131, 250},
+    {87, 250},  {110, 250}, {131, 250}, {110, 250},
+    {73, 250},  {87, 250},  {110, 250}, {87, 250},
+    {55, 250},  {73, 250},  {110, 250}, {73, 250},
+};
+constexpr int kGameOverArpNotesCount =
+    sizeof(kGameOverArpNotes) / sizeof(kGameOverArpNotes[0]);
+
+inline constexpr MusicNote kGameOverChordNotes[] = {
+    {220, 1000}, {175, 1000}, {147, 1000}, {165, 1000},
+    {220, 1000}, {175, 1000}, {147, 1000}, {110, 1000},
+};
+constexpr int kGameOverChordNotesCount =
+    sizeof(kGameOverChordNotes) / sizeof(kGameOverChordNotes[0]);
+
+inline constexpr MusicNote kGameOverBassNotes[] = {
+    {55, 1000}, {44, 1000}, {37, 1000}, {41, 1000},
+    {55, 1000}, {44, 1000}, {37, 1000}, {27, 1000},
+};
+constexpr int kGameOverBassNotesCount =
+    sizeof(kGameOverBassNotes) / sizeof(kGameOverBassNotes[0]);
+
+inline constexpr DrumNote kGameOverDrumNotes[] = {
+    {kDrumKick, 500}, {kDrumRest, 500}, {kDrumRest, 500}, {kDrumTom, 500},
+    {kDrumKick, 500}, {kDrumRest, 500}, {kDrumRest, 500}, {kDrumTom, 500},
+    {kDrumKick, 500}, {kDrumRest, 500}, {kDrumRest, 500}, {kDrumTom, 500},
+    {kDrumKick, 500}, {kDrumRest, 500}, {kDrumRest, 500}, {kDrumTom, 500},
+};
+constexpr int kGameOverDrumNotesCount =
+    sizeof(kGameOverDrumNotes) / sizeof(kGameOverDrumNotes[0]);
+
+template <std::size_t N>
+constexpr uint32_t music_duration_ms(const MusicNote (&notes)[N]) {
+    uint32_t total = 0;
+    for (const MusicNote& note : notes) {
+        total += note.duration_ms;
+    }
+    return total;
+}
+
+template <std::size_t N>
+constexpr uint32_t drum_duration_ms(const DrumNote (&notes)[N]) {
+    uint32_t total = 0;
+    for (const DrumNote& note : notes) {
+        total += note.duration_ms;
+    }
+    return total;
+}
+
+static_assert(music_duration_ms(kGameOverLeadNotes) == kGameOverMusicDurationMs);
+static_assert(music_duration_ms(kGameOverArpNotes) == kGameOverMusicDurationMs);
+static_assert(music_duration_ms(kGameOverChordNotes) == kGameOverMusicDurationMs);
+static_assert(music_duration_ms(kGameOverBassNotes) == kGameOverMusicDurationMs);
+static_assert(drum_duration_ms(kGameOverDrumNotes) == kGameOverMusicDurationMs);
 
 inline const DrumNote kDrumNotes[] = {
     {4, 200}, {3, 200}, {2, 200}, {3, 200},

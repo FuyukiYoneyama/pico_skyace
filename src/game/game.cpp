@@ -12,6 +12,7 @@
 #include "pico/stdlib.h"
 #include "platform/picocalc_audio.h"
 #include "platform/picocalc_display.h"
+#include "platform/high_score.h"
 #include "platform/picocalc_key_table.h"
 #include "platform/picocalc_keyboard.h"
 #include "platform/screenshot_capture.h"
@@ -49,22 +50,32 @@ constexpr int kFocal = 110;          // 内部解像度での焦点距離（px�
 constexpr int kCx = 80;              // 画面中心
 constexpr int kCy = 80;
 constexpr int kReticleY = 72;        // 照準の画面 y
+constexpr int kHighScoreY = 2;       // 常に画面最上段へ表示
 
 constexpr int kMaxEnemies = 5;
 constexpr int kMaxMissiles = 4;
 constexpr int kMaxExplosions = 6;
 constexpr int kAttackWarningFrames = 18;  // 約0.6秒の予告
 constexpr int kApproachWarningResetMarginM = 180;
+constexpr int kApproachWarningLeadM = 90;
+constexpr int kApproachWarningMinDistanceM = 620;
+constexpr int kApproachWarningMaxDistanceM = 820;
+constexpr int kApproachWarningClosingEpsilonM = 2;
 constexpr int kGunRoundsPerEnemy = 30;
 constexpr int kGunHitDistanceM = 760;
 constexpr int kGunHitHalfWidthPx = 14;
 constexpr int kGunHitHalfHeightPx = 14;
+constexpr int kMissileUnderwingDropM = 2;
 // 攻撃態勢の機体は自機（最大150m/s）を確実に詰められる速度にする。
 // 後方へ出現した場合でも、最遠1400mから約10秒以内に射撃距離へ入る。
 constexpr int kEnemyAttackMinSpeedM = 180;
 constexpr int kWaveClearFrames = 45;  // 約1.5秒のクリア演出
+constexpr int32_t kAltitudeSpeedResponseDivisor = 512;
 
 constexpr int32_t kQ8 = 256;
+// 近接投影では小さなワールド座標差も大きく見えるため、翼幅から
+// 離れて見えない0.5mを発射レールの左右オフセットとする。
+constexpr int32_t kMissileWingOffsetQ8 = kQ8 / 2;
 
 // 色
 constexpr uint16_t kColHudGreen = gfx::rgb(60, 255, 90);
@@ -114,6 +125,7 @@ struct Player {
     int32_t speed_q8;     // m/s Q8
     int hp;
     int missiles;
+    bool missile_left_next;
     int gun_ammo;
     int gun_cd;
     int gun_flash;
@@ -234,6 +246,8 @@ int g_wave_clear_timer = 0;
 int g_wave_clear_wave = 0;
 int g_score = 0;
 int g_kills = 0;
+int g_high_score = 0;
+bool g_new_high_score = false;
 int g_banner_timer = 0;
 int g_msg_timer = 0;
 char g_msg[24] = "";
@@ -321,6 +335,19 @@ uint16_t plane_palette(char c) {
         case 'R': return gfx::rgb(220, 40, 40);
         case 'O': return kColOrange;
         case 'Y': return kColYellow;
+        default: return kColWhite;
+    }
+}
+
+uint16_t plane_hit_palette(char c) {
+    // 被弾時は機体全体を明るく反転気味にして、画面端の赤枠だけに
+    // 頼らず自機そのものが点滅していることを伝える。
+    switch (c) {
+        case 'R': return kColWhite;
+        case 'C': return kColYellow;
+        case 'O': return kColWhite;
+        case 'Y': return kColWhite;
+        case 'W': return kColWhite;
         default: return kColWhite;
     }
 }
@@ -580,6 +607,17 @@ void update_wave_aggression() {
 }
 
 void start_wave(int wave) {
+    // ウェーブ間のクリア表示中は撃墜演出の更新を止めているため、最後に
+    // 倒した敵のExplosionがそのまま次ウェーブへ持ち越されることがある。
+    // 新しいウェーブは新しい戦闘画面として開始し、前ウェーブの敵影・弾道を
+    // 1フレームも残さないよう、境界で一時オブジェクトを破棄する。
+    std::memset(g_ex, 0, sizeof(g_ex));
+    std::memset(g_ms, 0, sizeof(g_ms));
+    g_pl.lock_target = -1;
+    g_pl.lock_generation = 0;
+    g_pl.lock_timer = 0;
+    g_pl.guide_target = -1;
+    g_pl.guide_generation = 0;
     g_wave = wave;
     const int n = enemies_for_wave(wave);
     g_wave_enemy_total = n;
@@ -627,6 +665,7 @@ void reset_game(int initial_wave = 1) {
     g_pl.speed_q8 = 90 * kQ8;
     g_pl.hp = 100;
     g_pl.missiles = 8;
+    g_pl.missile_left_next = true;
     g_pl.gun_ammo = 0;
     g_pl.lock_target = -1;
     g_pl.lock_generation = 0;
@@ -635,6 +674,7 @@ void reset_game(int initial_wave = 1) {
     g_play_tick = 0;
     g_score = 0;
     g_kills = 0;
+    g_new_high_score = false;
     g_crashed = false;
     g_msg_timer = 0;
     g_death_reason = DeathReason::None;
@@ -752,6 +792,15 @@ void play_title_music() {
                       bgm::kTitleDrumNotes, bgm::kTitleDrumNotesCount, true);
 }
 
+void play_gameover_music() {
+    audio::music_play(bgm::kGameOverLeadNotes, bgm::kGameOverLeadNotesCount,
+                      bgm::kGameOverArpNotes, bgm::kGameOverArpNotesCount,
+                      bgm::kGameOverChordNotes, bgm::kGameOverChordNotesCount,
+                      bgm::kGameOverBassNotes, bgm::kGameOverBassNotesCount,
+                      bgm::kGameOverDrumNotes, bgm::kGameOverDrumNotesCount,
+                      true);
+}
+
 void update_guidance_target();
 
 void enter_play_from_reset(const char* transition) {
@@ -854,6 +903,8 @@ void finalize_gameover() {
     }
     g_demo_mode = false;
     g_result = {g_score, g_wave, g_kills, g_play_tick, g_death_reason};
+    g_new_high_score = high_score::submit(g_result.score);
+    g_high_score = high_score::current();
     g_mode = Mode::GameOver;
     g_title_deadline_us = 0;
     g_demo_deadline_us = 0;
@@ -869,7 +920,7 @@ void finalize_gameover() {
                 static_cast<unsigned long>(g_play_tick),
                 static_cast<int>(g_death_reason));
     audio::set_engine(0);
-    play_title_music();
+    play_gameover_music();
 }
 
 // ---------------------------------------------------------------- 更新
@@ -890,10 +941,19 @@ bool fire_missile() {
         const int32_t fx = fm::mul_q12(fm::sin_q12(yaw), cp);
         const int32_t fz = fm::mul_q12(fm::cos_q12(yaw), cp);
         const int32_t v0 = g_pl.speed_q8 + 80 * kQ8;
+        // ミサイルは機首中央ではなく、左右の翼下パイロンから発射する。
+        // yawに合わせた機体右方向へオフセットし、成功した発射ごとに
+        // 左右を反転する。高さは翼下へ2m下げるが、速度ベクトルは機首方向を保つ。
+        const int side = g_pl.missile_left_next ? -1 : 1;
+        const int32_t wing_offset_q8 = side * kMissileWingOffsetQ8;
+        const int32_t right_x = fm::cos_q12(yaw);
+        const int32_t right_z = -fm::sin_q12(yaw);
         m.active = true;
-        m.x = g_pl.x;
-        m.y = g_pl.y - 2 * kQ8;
-        m.z = g_pl.z;
+        m.x = g_pl.x + static_cast<int32_t>(
+            (static_cast<int64_t>(wing_offset_q8) * right_x) >> 12);
+        m.y = g_pl.y - kMissileUnderwingDropM * kQ8;
+        m.z = g_pl.z + static_cast<int32_t>(
+            (static_cast<int64_t>(wing_offset_q8) * right_z) >> 12);
         m.vx = static_cast<int32_t>((static_cast<int64_t>(v0) * fx) >> 12);
         m.vz = static_cast<int32_t>((static_cast<int64_t>(v0) * fz) >> 12);
         m.vy = static_cast<int32_t>((static_cast<int64_t>(v0) * sp) >> 12);
@@ -910,6 +970,7 @@ bool fire_missile() {
         m.trail_n = 0;
         m.trail_head = 0;
         --g_pl.missiles;
+        g_pl.missile_left_next = !g_pl.missile_left_next;
         play_game_sfx(audio::Sfx::Missile);
         return true;
     }
@@ -985,14 +1046,27 @@ void update_player_motion() {
         g_pl.speed_q8 = 150 * kQ8;
     }
 
+    // 高度変化に速度を連動させる。上昇中は運動エネルギーを高度へ使うため
+    // 減速し、下降中は加速する。ピッチ角ではなく実際の垂直速度から求める
+    // ので、機首が水平へ戻る途中も自然に効き、水平飛行の速度は変えない。
+    const int8_t pitch = static_cast<int8_t>(g_pl.pitch_q8 >> 8);
+    const int32_t sp = fm::sin_q12(static_cast<uint8_t>(pitch));
+    const int32_t cp = fm::cos_q12(static_cast<uint8_t>(pitch));
+    const int32_t vertical_speed_q8 = static_cast<int32_t>(
+        (static_cast<int64_t>(g_pl.speed_q8) * sp) >> 12);
+    g_pl.speed_q8 -= vertical_speed_q8 / kAltitudeSpeedResponseDivisor;
+    if (g_pl.speed_q8 < 45 * kQ8) {
+        g_pl.speed_q8 = 45 * kQ8;
+    }
+    if (g_pl.speed_q8 > 150 * kQ8) {
+        g_pl.speed_q8 = 150 * kQ8;
+    }
+
     // エンジン音: 速度を基準に、スロットル操作と操縦負荷も反映する。
     set_engine_for_controls();
 
     // 移動
     const uint8_t yaw = static_cast<uint8_t>(g_pl.yaw_q8 >> 8);
-    const int8_t pitch = static_cast<int8_t>(g_pl.pitch_q8 >> 8);
-    const int32_t sp = fm::sin_q12(static_cast<uint8_t>(pitch));
-    const int32_t cp = fm::cos_q12(static_cast<uint8_t>(pitch));
     const int32_t hspeed = static_cast<int32_t>(
         (static_cast<int64_t>(g_pl.speed_q8) * cp) >> 12);
     const int32_t vspeed = static_cast<int32_t>(
@@ -1204,20 +1278,6 @@ void update_enemy(int idx) {
         static_cast<uint64_t>(dx * dx + dz * dz)) >> 8;
     const bool aggressive_wave = g_wave_aggressive;
 
-    // 攻撃フェーズへ移ってから、攻撃態勢へコミットした時、または攻撃距離へ
-    // 初めて入った時だけ接近警告を鳴らす。遠巻きフェーズでは、近くを通過しても
-    // 攻撃予告を出さない。境界付近での行き来による連打も避ける。
-    if (aggressive_wave && !e.approach_warning_played &&
-        (e.mode == EnemyMode::Attack ||
-         dist_m <= static_cast<uint32_t>(tuning.attack_distance_m))) {
-        e.approach_warning_played = true;
-        play_game_sfx(audio::Sfx::EnemyApproach);
-    } else if (e.approach_warning_played &&
-               dist_m > static_cast<uint32_t>(
-                   tuning.attack_distance_m + kApproachWarningResetMarginM)) {
-        e.approach_warning_played = false;
-    }
-
     // ミサイルに狙われたら回避（Bomber は回避運動をしない鈍重な機体）
     if (e.mode != EnemyMode::Evade && stats.can_evade && missile_targets(idx)) {
         e.mode = EnemyMode::Evade;
@@ -1328,6 +1388,37 @@ void update_enemy(int idx) {
         (static_cast<int64_t>(move_speed_q8) * fm::sin_q12(yaw)) >> 12) / 30;
     e.z += static_cast<int32_t>(
         (static_cast<int64_t>(move_speed_q8) * fm::cos_q12(yaw)) >> 12) / 30;
+
+    // 接近警告は「攻撃態勢になった」だけでは鳴らさない。前方の遠い敵が
+    // 攻撃フェーズへ切り替わった瞬間の誤警告を避けるため、射撃距離の少し手前
+    // まで実際に距離が縮んだ時だけ一度鳴らす。Wave後半でも遠すぎる位置へ
+    // 警告範囲が広がらないよう上限を設ける。
+    const int previous_dist_m = static_cast<int>(dist_m);
+    const int64_t current_dx = g_pl.x - e.x;
+    const int64_t current_dz = g_pl.z - e.z;
+    const uint32_t current_dist_m = fm::isqrt64(
+        static_cast<uint64_t>(current_dx * current_dx +
+                              current_dz * current_dz)) >> 8;
+    int approach_warning_distance_m =
+        tuning.fire_distance_m + kApproachWarningLeadM;
+    if (approach_warning_distance_m < kApproachWarningMinDistanceM) {
+        approach_warning_distance_m = kApproachWarningMinDistanceM;
+    }
+    if (approach_warning_distance_m > kApproachWarningMaxDistanceM) {
+        approach_warning_distance_m = kApproachWarningMaxDistanceM;
+    }
+    const bool closing =
+        current_dist_m + kApproachWarningClosingEpsilonM <
+        static_cast<uint32_t>(previous_dist_m);
+    if (aggressive_wave && !e.approach_warning_played && closing &&
+        current_dist_m <= static_cast<uint32_t>(approach_warning_distance_m)) {
+        e.approach_warning_played = true;
+        play_game_sfx(audio::Sfx::EnemyApproach);
+    } else if (e.approach_warning_played &&
+               current_dist_m > static_cast<uint32_t>(
+                   approach_warning_distance_m + kApproachWarningResetMarginM)) {
+        e.approach_warning_played = false;
+    }
 
     // 攻撃（プレイヤーが正面コーンに入っていれば、まず予告してから射撃）
     if (e.fire_cd > 0) {
@@ -1517,6 +1608,15 @@ void update_explosions() {
     }
 }
 
+bool any_active_explosion() {
+    for (const auto& e : g_ex) {
+        if (e.active) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void update_play() {
     ++g_play_tick;
 
@@ -1577,6 +1677,11 @@ void update_play() {
         }
     }
     if (!any_alive) {
+        // 最後の敵を倒したフレームに爆発演出が残っている場合は、クリア画面へ
+        // 先に切り替えず、爆発が完全に消えるまで通常画面を描画し続ける。
+        if (any_active_explosion()) {
+            return;
+        }
         g_score += 200;  // ウェーブクリアボーナス
         g_wave_clear_wave = g_wave;
         g_wave_clear_timer = kWaveClearFrames;
@@ -1994,7 +2099,11 @@ void render_player_plane() {
     } else if (g_pl.roll > 12) {
         art = g_bank_right;
     }
-    gfx::art(art, kPlaneRows, px, py, 256, plane_palette);
+    // 被弾後は機体そのものを明滅させる。dmg_flashは被弾時に8へ設定され、
+    // 交互のフレームだけ明るい専用パレットへ切り替える。
+    const bool damage_blink = g_pl.dmg_flash > 0 && ((g_frame & 1u) == 0);
+    gfx::art(art, kPlaneRows, px, py, 256,
+             damage_blink ? plane_hit_palette : plane_palette);
     // エンジン光
     if (g_frame & 1) {
         gfx::fill_rect(px - 1, py + 7, 3, 2, kColOrange);
@@ -2300,11 +2409,13 @@ void render_hud() {
     gfx::line(kCx, kReticleY - 12, kCx, kReticleY - 8, kColHudGreen);
     gfx::line(kCx, kReticleY + 8, kCx, kReticleY + 12, kColHudGreen);
 
-    // 機銃トレーサ
+    // 機銃トレーサは機首から1本だけ伸ばす。
     if (g_pl.gun_flash > 0) {
         const int jx = static_cast<int>(fm::rnd_fx() % 5) - 2;
-        gfx::line(64, 132, kCx + jx, kReticleY + 2, kColYellow);
-        gfx::line(96, 132, kCx + jx, kReticleY + 2, kColYellow);
+        const int nose_x = kCx - g_pl.roll / 4;
+        const int nose_y = 124 + static_cast<int>((g_frame >> 3) & 1) -
+                           kPlaneRows / 2;
+        gfx::line(nose_x, nose_y, kCx + jx, kReticleY + 2, kColYellow);
     }
     if (g_pl.hit_flash > 0) {
         const int d = 14;
@@ -2378,9 +2489,10 @@ void render_hud() {
     render_attack_warning();
     render_guidance_arrow();
 
-    // レーダー（左下）
+    // レーダー（左下）。最下行を兵装表示に専用化するため、従来より2px上へ
+    // 移動し、GUNの文字列と円の最下端が重ならないようにする。
     const int rx = 21;
-    const int ry = 137;
+    const int ry = 135;
     const int rr = 16;
     gfx::fill_circle(rx, ry, rr, gfx::rgb(6, 26, 10));
     gfx::circle_outline(rx, ry, rr, kColHudDim);
@@ -2432,23 +2544,24 @@ void render_hud() {
     const int spd_kmh = static_cast<int>(
         (static_cast<int64_t>(g_pl.speed_q8) * 36) / (10 * kQ8));
     std::snprintf(buf, sizeof(buf), "SPD %3d", spd_kmh);
-    gfx::text(42, 146, buf, kColHudGreen);
+    gfx::text(42, 137, buf, kColHudGreen);
     std::snprintf(buf, sizeof(buf), "ALT %4ld", static_cast<long>(g_pl.y >> 8));
-    gfx::text(42, 153, buf, kColHudGreen);
+    gfx::text(42, 145, buf, kColHudGreen);
 
+    // 最下行は兵装で統一: 左GUN／右ミサイル。HPはその一つ上へ移す。
     std::snprintf(buf, sizeof(buf), "GUN%3d", g_pl.gun_ammo);
-    gfx::text(3, 146, buf, kColYellow);
-    std::snprintf(buf, sizeof(buf), "MSL %2d", g_pl.missiles);
-    gfx::text(118, 146, buf, kColYellow);
+    gfx::text(3, 153, buf, kColYellow);
     // HP バー
-    gfx::text(96, 153, "HP", kColHudGreen);
-    gfx::rect_outline(110, 153, 44, 6, kColHudDim);
+    gfx::text(96, 146, "HP", kColHudGreen);
+    gfx::rect_outline(110, 146, 44, 6, kColHudDim);
     const int hpw = g_pl.hp * 42 / 100;
     const uint16_t hpc = g_pl.hp > 50 ? kColHudGreen
                         : (g_pl.hp > 25 ? kColYellow : kColRed);
     if (hpw > 0) {
-        gfx::fill_rect(111, 154, hpw, 4, hpc);
+        gfx::fill_rect(111, 147, hpw, 4, hpc);
     }
+    std::snprintf(buf, sizeof(buf), "MSL %2d", g_pl.missiles);
+    gfx::text(118, 153, buf, kColYellow);
 
     // 警告
     if (g_pl.y < 60 * kQ8 && (g_frame & 4)) {
@@ -2534,6 +2647,11 @@ void render_title() {
                   PICO_SKYACE_VERSION_STRING);
     gfx::text(kCx - gfx::text_width(version) / 2, 98, version, kColHudGreen);
 
+    char high_score[24];
+    std::snprintf(high_score, sizeof(high_score), "HI-SCORE %06d", g_high_score);
+    gfx::text(kCx - gfx::text_width(high_score) / 2, kHighScoreY, high_score,
+              kColYellow);
+
     if (g_frame & 8) {
         gfx::text(kCx - gfx::text_width("PRESS ENTER", 2) / 2, 140,
                   "PRESS ENTER", kColYellow, 2);
@@ -2594,8 +2712,15 @@ void render_gameover() {
     std::snprintf(buf, sizeof(buf), "CAUSE %s",
                   death_reason_label(g_result.death_reason));
     gfx::text(kCx - gfx::text_width(buf) / 2, 120, buf, kColRed);
+    std::snprintf(buf, sizeof(buf), "HI-SCORE %06d", g_high_score);
+    gfx::text(kCx - gfx::text_width(buf) / 2, kHighScoreY, buf,
+              g_new_high_score ? kColYellow : kColHudGreen);
+    if (g_new_high_score) {
+        gfx::text(kCx - gfx::text_width("NEW RECORD") / 2, 138,
+                  "NEW RECORD", kColYellow);
+    }
     if (g_frame & 8) {
-        gfx::text(kCx - gfx::text_width("PRESS ENTER") / 2, 136,
+        gfx::text(kCx - gfx::text_width("PRESS ENTER") / 2, 148,
                   "PRESS ENTER", kColYellow);
     }
 }
@@ -2605,6 +2730,8 @@ void render_gameover() {
 void run() {
     fm::init();
     init_mirrored_art();
+    high_score::init();
+    g_high_score = high_score::current();
     g_pl.y = 600 * kQ8;
     play_title_music();
     g_title_deadline_us = time_us_64() + kTitleDemoDelayUs;

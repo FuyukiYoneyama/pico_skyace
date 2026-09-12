@@ -29,6 +29,7 @@ add_executable(pico_skyace
     src/platform/picocalc_keyboard.cpp
     src/platform/picocalc_audio.cpp
     src/platform/screenshot_capture.cpp
+    src/platform/high_score.cpp
     src/platform/sd/picocalc_sdcard.cpp
     src/platform/sd/fatfs_diskio.cpp
     src/game/fixed_math.cpp

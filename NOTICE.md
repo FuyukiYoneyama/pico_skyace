@@ -35,7 +35,7 @@ applicable to the account and service used to create the output.
 ## FatFs (ChaN)
 
 `third_party/ChanFatFS/` contains ChaN's FatFs R0.14a source code, used by the
-SD-card screenshot feature. It is not part of the project's MIT-licensed
+SD-card screenshot and high-score features. It is not part of the project's MIT-licensed
 original code. Its complete license notice is preserved in
 [`third_party/ChanFatFS/LICENSE.txt`](third_party/ChanFatFS/LICENSE.txt).
 

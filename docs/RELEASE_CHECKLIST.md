@@ -9,7 +9,7 @@ build, behavior, target hardware, and distribution evidence.
 
 The v1.0.0 scope is the current endless-wave Sky Ace game on the standard
 RP2040 PicoCalc configuration: title, play, pause, game-over, demo, weapons,
-enemy AI, HUD, audio, and optional SD screenshots. Pico 2/RP2350 is outside the
+enemy AI, HUD, audio, SD screenshots, and optional SD-backed high scores. Pico 2/RP2350 is outside the
 supported target until separately tested.
 
 ## Already present in the repository
@@ -19,6 +19,8 @@ supported target until separately tested.
 - [x] FatFs R0.14a license retained with the vendored source.
 - [x] BGM provenance and distribution record (`docs/BGM_PROVENANCE.md`).
 - [x] Build and operation instructions in `README.md`.
+- [x] High-score display and SD-backed persistence with a session-only fallback
+      (`SKYHI_A.DAT` / `SKYHI_B.DAT`) are implemented and documented.
 - [x] Host logic test target; current result: 1/1 test passed.
 - [x] Product ELF Flash/RAM size and a non-hardware diagnostic stack high-water
       sample are recorded under
@@ -76,8 +78,8 @@ supported target until separately tested.
       production-BIN stability sample and non-hardware diagnostic p95/stack
       sample do not prove the real LCD-transfer frame time. Repeat this gate
       after the deferred 1.0.0 final build.
-- [x] Existing title/gameplay images are explicitly labeled as historical; a
-      final-firmware capture can replace them for the v1.0.0 release page.
+- [x] README gameplay image was replaced with the supplied combat capture; a
+      final-firmware capture may replace it again for the v1.0.0 release page.
 - [ ] Create the `v1.0.0` Git tag and GitHub Release, attaching the UF2 and its
       checksum alongside `CHANGELOG.md`, `NOTICE.md`, and the supported-target
       notes.
