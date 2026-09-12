@@ -50,7 +50,7 @@ supported target until separately tested.
       variants, plus direct retry, pause/resume, and weapon/target edge cases;
       reports are archived under
       [`build-artifacts/2026-09-10-nonhardware/`](../build-artifacts/2026-09-10-nonhardware/).
-      The strict Title→Demo→Title and GameOver→Title guards use the production
+      The strict Title->Demo->Title and GameOver->Title guards use the production
       BIN and pass with no exception, unsupported MMIO, or keyboard drops. The
       GameOver guard is UART-only; a full-LCD GameOver framebuffer run remains
       impractical in the current cycle-accurate model and is not claimed here.
@@ -59,8 +59,8 @@ supported target until separately tested.
       run explicitly reports detect-high, `no_card`, and mount failure recovery.
 - [x] User-reported hardware smoke test of the current v0.9.3 product UF2:
       cold boot, LCD output, keyboard input, simultaneous movement/weapon
-      input, BGM (including percussion), SFX, engine sound, Title→Demo→Title,
-      GameOver→Title, SD-present/absent F5 handling, and power-cycle recovery
+      input, BGM (including percussion), SFX, engine sound, Title->Demo->Title,
+      GameOver->Title, SD-present/absent F5 handling, and power-cycle recovery
       all passed. This is a manual report; the UF2 hash, photos/UART capture,
       and exact test timestamp were not supplied.
 - [ ] Verify the final UF2 on an actual standard RP2040 PicoCalc: cold boot,
