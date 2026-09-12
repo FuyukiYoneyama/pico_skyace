@@ -106,13 +106,27 @@ EnemyWaveTuning enemy_wave_tuning(int wave, int attack_bias, int fire_cd,
         tuned_fire_cd,
         550 + level * 35,
         6 + level / 2,
-        120 + level * 8,
+        // 出現高度のばらつきがあっても、攻撃態勢へ入った機体が
+        // そのまま射線を失い続けないようにする。
+        220 + level * 8,
         tuned_hit_pct,
         spawn_min,
         spawn_max,
         attack_min,
         attack_max,
     };
+}
+
+bool should_begin_aggressive_attack(int living_enemies, int wave_enemies,
+                                    uint32_t wave_elapsed_frames) {
+    if (wave_enemies <= 0) {
+        return false;
+    }
+    const bool half_or_fewer = living_enemies >= 0 &&
+                               living_enemies * 2 <= wave_enemies;
+    constexpr uint32_t kAggressiveAfterFrames = 20u * 30u;
+    const bool time_limit_passed = wave_elapsed_frames > kAggressiveAfterFrames;
+    return half_or_fewer || time_limit_passed;
 }
 
 int32_t scale_enemy_speed(int32_t speed_q8, int wave) {

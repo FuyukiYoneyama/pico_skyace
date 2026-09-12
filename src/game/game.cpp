@@ -38,6 +38,7 @@ constexpr int kFrameMs = 33;         // 約 30fps
 constexpr uint32_t kGameOverAutoReturnMs = 10000;
 constexpr uint32_t kTitleDemoDelayMs = PICO_SKYACE_TITLE_DEMO_DELAY_MS;
 constexpr uint32_t kDemoDurationMs = 30000;
+constexpr int kDemoStartWave = 4;
 constexpr uint64_t kGameOverAutoReturnUs =
     static_cast<uint64_t>(kGameOverAutoReturnMs) * 1000u;
 constexpr uint64_t kTitleDemoDelayUs =
@@ -53,6 +54,15 @@ constexpr int kMaxEnemies = 5;
 constexpr int kMaxMissiles = 4;
 constexpr int kMaxExplosions = 6;
 constexpr int kAttackWarningFrames = 18;  // 約0.6秒の予告
+constexpr int kApproachWarningResetMarginM = 180;
+constexpr int kGunRoundsPerEnemy = 30;
+constexpr int kGunHitDistanceM = 760;
+constexpr int kGunHitHalfWidthPx = 14;
+constexpr int kGunHitHalfHeightPx = 14;
+// 攻撃態勢の機体は自機（最大150m/s）を確実に詰められる速度にする。
+// 後方へ出現した場合でも、最遠1400mから約10秒以内に射撃距離へ入る。
+constexpr int kEnemyAttackMinSpeedM = 180;
+constexpr int kWaveClearFrames = 45;  // 約1.5秒のクリア演出
 
 constexpr int32_t kQ8 = 256;
 
@@ -61,8 +71,13 @@ constexpr uint16_t kColHudGreen = gfx::rgb(60, 255, 90);
 constexpr uint16_t kColHudDim = gfx::rgb(30, 120, 50);
 constexpr uint16_t kColRed = gfx::rgb(255, 40, 40);
 constexpr uint16_t kColYellow = gfx::rgb(255, 230, 60);
+constexpr uint16_t kColSunGlow = gfx::rgb(255, 235, 150);
+constexpr uint16_t kColSun = gfx::rgb(255, 205, 50);
 constexpr uint16_t kColWhite = gfx::rgb(255, 255, 255);
 constexpr uint16_t kColOrange = gfx::rgb(255, 140, 30);
+// 撃墜時の赤や暗転と区別しやすい、明るい静止クリア画面。
+constexpr uint16_t kColWaveClear = gfx::rgb(24, 112, 204);
+constexpr uint16_t kColWaveClearAccent = gfx::rgb(80, 220, 255);
 
 constexpr uint16_t kColSky0 = gfx::rgb(10, 32, 120);    // 天頂
 constexpr uint16_t kColSky1 = gfx::rgb(28, 62, 158);
@@ -99,6 +114,7 @@ struct Player {
     int32_t speed_q8;     // m/s Q8
     int hp;
     int missiles;
+    int gun_ammo;
     int gun_cd;
     int gun_flash;
     int hit_flash;
@@ -126,6 +142,7 @@ struct Enemy {
     int16_t timer;
     int16_t fire_cd;
     int16_t warning_timer;
+    bool approach_warning_played;
     // 直近フレームの投影キャッシュ（HUD・照準判定用）
     bool vis;
     int sx, sy;
@@ -210,6 +227,11 @@ uint32_t g_demo_timer = 0;
 uint32_t g_enemy_generation = 0;
 int g_demo_attack_cooldown = 0;
 int g_wave = 0;
+int g_wave_enemy_total = 0;
+uint32_t g_wave_elapsed_frames = 0;
+bool g_wave_aggressive = false;
+int g_wave_clear_timer = 0;
+int g_wave_clear_wave = 0;
 int g_score = 0;
 int g_kills = 0;
 int g_banner_timer = 0;
@@ -492,6 +514,9 @@ void spawn_enemy() {
             alt = 2500 * kQ8;
         }
         e.y = alt;
+        // Wave開始直後は以前のようにランダムな巡航で遠巻きにする。
+        // 残敵が半分以下になるか20秒を超えた時点で、Wave全体を攻撃態勢へ
+        // 切り替えるので、開始直後からの急な追尾にはしない。
         e.yaw_q8 = static_cast<uint16_t>(fm::rnd() & 0xffff);
         e.type = pick_enemy_type(g_wave);
         const EnemyStats stats = enemy_stats(e.type);
@@ -503,10 +528,11 @@ void spawn_enemy() {
         e.turn_dir = (fm::rnd() & 1) ? 1 : -1;
         const rules::EnemyWaveTuning tuning = rules::enemy_wave_tuning(
             g_wave, stats.attack_bias, stats.fire_cd, stats.hit_pct);
-        e.timer = static_cast<int16_t>(
-            fm::rnd_range(tuning.spawn_timer_min, tuning.spawn_timer_max));
+        e.timer = static_cast<int16_t>(fm::rnd_range(
+            tuning.spawn_timer_min, tuning.spawn_timer_max));
         e.fire_cd = 30;
         e.warning_timer = 0;
+        e.approach_warning_played = false;
         e.vis = false;
         std::printf("SPAWN wave=%d type=%d\r\n", g_wave, static_cast<int>(e.type));
         return;
@@ -518,9 +544,47 @@ int enemies_for_wave(int wave) {
     return n > kMaxEnemies ? kMaxEnemies : n;
 }
 
+int living_enemy_count() {
+    int count = 0;
+    for (const auto& e : g_en) {
+        if (e.alive) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+void update_wave_aggression() {
+    if (g_wave_aggressive || !rules::should_begin_aggressive_attack(
+                               living_enemy_count(), g_wave_enemy_total,
+                               g_wave_elapsed_frames)) {
+        return;
+    }
+
+    const int remaining = living_enemy_count();
+    const bool count_trigger = remaining * 2 <= g_wave_enemy_total;
+    g_wave_aggressive = true;
+    std::printf("WAVE AGGRESSIVE wave=%d remaining=%d elapsed=%lu trigger=%s\r\n",
+                g_wave, remaining,
+                static_cast<unsigned long>(g_wave_elapsed_frames),
+                count_trigger ? "count" : "time");
+
+    // 条件成立フレームから全機を攻撃態勢へ移す。ミサイル回避中の機体だけは
+    // 回避を完了してから攻撃へ戻す。
+    for (auto& e : g_en) {
+        if (e.alive && e.mode != EnemyMode::Evade) {
+            e.mode = EnemyMode::Attack;
+            e.timer = 0;
+        }
+    }
+}
+
 void start_wave(int wave) {
     g_wave = wave;
     const int n = enemies_for_wave(wave);
+    g_wave_enemy_total = n;
+    g_wave_elapsed_frames = 0;
+    g_wave_aggressive = false;
     const rules::EnemyWaveTuning tuning =
         rules::enemy_wave_tuning(wave, 0, 26, 60);
     std::printf("WAVE START wave=%d enemies=%d aggression=%d frame=%lu\r\n",
@@ -529,6 +593,9 @@ void start_wave(int wave) {
     for (int i = 0; i < n; ++i) {
         spawn_enemy();
     }
+    // 次のWaveへ進んだらGUN弾数を満タンに戻す。敵機数に比例して
+    // 余裕も増やし、敵数だけ増えて弾だけ足りなくなることを避ける。
+    g_pl.gun_ammo = n * kGunRoundsPerEnemy;
     g_pl.missiles += 4;
     if (g_pl.missiles > 16) {
         g_pl.missiles = 16;
@@ -542,11 +609,16 @@ void start_wave(int wave) {
     g_banner_timer = 60;
 }
 
-void reset_game() {
+void reset_game(int initial_wave = 1) {
     std::memset(g_en, 0, sizeof(g_en));
     std::memset(g_ms, 0, sizeof(g_ms));
     std::memset(g_ex, 0, sizeof(g_ex));
     g_enemy_generation = 0;
+    g_wave_enemy_total = 0;
+    g_wave_elapsed_frames = 0;
+    g_wave_aggressive = false;
+    g_wave_clear_timer = 0;
+    g_wave_clear_wave = 0;
     g_pl = Player{};
     g_pl.x = 0;
     g_pl.y = 800 * kQ8;
@@ -555,6 +627,7 @@ void reset_game() {
     g_pl.speed_q8 = 90 * kQ8;
     g_pl.hp = 100;
     g_pl.missiles = 8;
+    g_pl.gun_ammo = 0;
     g_pl.lock_target = -1;
     g_pl.lock_generation = 0;
     g_pl.guide_target = -1;
@@ -566,7 +639,7 @@ void reset_game() {
     g_msg_timer = 0;
     g_death_reason = DeathReason::None;
     g_result = {};
-    start_wave(1);
+    start_wave(initial_wave);
 }
 
 void set_msg(const char* s) {
@@ -583,6 +656,14 @@ void apply_player_damage(int amount, DeathReason reason) {
     g_pl.hp = result.hp;
     g_death_reason = result.death_reason;
     g_pl.dmg_flash = 8;
+}
+
+void check_ammo_depleted() {
+    if (g_death_reason == DeathReason::None &&
+        g_pl.gun_ammo <= 0 && g_pl.missiles <= 0) {
+        g_death_reason = DeathReason::OutOfAmmo;
+        set_msg("OUT OF AMMO");
+    }
 }
 
 uint8_t engine_throttle_for_speed(int32_t speed_q8) {
@@ -716,7 +797,7 @@ void enter_demo() {
     // デモの出撃だけは毎回同じ乱数シードにする。敵の初期配置・AIの分岐は
     // 実プレイと同じだが、タイトル画面を何度見たかで展開が変わらない。
     fm::seed_rng(0xd3e0a11u);
-    reset_game();
+    reset_game(kDemoStartWave);
     g_mode = Mode::Demo;
     g_demo_timer = 0;
     g_title_deadline_us = 0;
@@ -763,7 +844,7 @@ void finalize_gameover() {
         std::printf("DEMO RESET frame=%lu reason=%d\r\n",
                     static_cast<unsigned long>(g_frame),
                     static_cast<int>(reason));
-        reset_game();
+        reset_game(kDemoStartWave);
         g_mode = Mode::Demo;
         g_demo_mode = true;
         g_demo_attack_cooldown = 0;
@@ -993,30 +1074,40 @@ void update_player_weapons() {
         --g_pl.gun_flash;
     }
     if (g_in.down[keys::Space] && g_pl.gun_cd == 0) {
-        g_pl.gun_cd = 3;
-        g_pl.gun_flash = 3;
-        play_game_sfx(audio::Sfx::Gun);
-        for (int i = 0; i < kMaxEnemies; ++i) {
-            Enemy& e = g_en[i];
-            if (!e.alive || !e.vis) {
-                continue;
-            }
-            if (e.zc < 700 * kQ8 &&
-                e.sx > kCx - 10 && e.sx < kCx + 10 &&
-                e.sy > kReticleY - 10 && e.sy < kReticleY + 10) {
-                e.hp -= 9;
-                g_pl.hit_flash = 5;
-                if (e.hp <= 0) {
-                    e.alive = false;
-                    ++g_kills;
-                    spawn_explosion(e.x, e.y, e.z);
-                    const int reward = enemy_stats(e.type).score;
-                    g_score += reward;
-                    char msg[24];
-                    std::snprintf(msg, sizeof(msg), "ENEMY DOWN +%d", reward);
-                    set_msg(msg);
+        if (g_pl.gun_ammo <= 0) {
+            // 押しっぱなしでもメッセージがちらつかないよう、短い間隔で
+            // 通知する。ミサイルが残っていればゲームオーバーにはしない。
+            g_pl.gun_cd = 10;
+            set_msg("GUN EMPTY");
+        } else {
+            --g_pl.gun_ammo;
+            g_pl.gun_cd = 3;
+            g_pl.gun_flash = 3;
+            play_game_sfx(audio::Sfx::Gun);
+            for (int i = 0; i < kMaxEnemies; ++i) {
+                Enemy& e = g_en[i];
+                if (!e.alive || !e.vis) {
+                    continue;
                 }
-                break;
+                if (e.zc < kGunHitDistanceM * kQ8 &&
+                    e.sx >= kCx - kGunHitHalfWidthPx &&
+                    e.sx <= kCx + kGunHitHalfWidthPx &&
+                    e.sy >= kReticleY - kGunHitHalfHeightPx &&
+                    e.sy <= kReticleY + kGunHitHalfHeightPx) {
+                    e.hp -= 9;
+                    g_pl.hit_flash = 5;
+                    if (e.hp <= 0) {
+                        e.alive = false;
+                        ++g_kills;
+                        spawn_explosion(e.x, e.y, e.z);
+                        const int reward = enemy_stats(e.type).score;
+                        g_score += reward;
+                        char msg[24];
+                        std::snprintf(msg, sizeof(msg), "ENEMY DOWN +%d", reward);
+                        set_msg(msg);
+                    }
+                    break;
+                }
             }
         }
     }
@@ -1111,6 +1202,21 @@ void update_enemy(int idx) {
     const int64_t dz = g_pl.z - e.z;
     const uint32_t dist_m = fm::isqrt64(
         static_cast<uint64_t>(dx * dx + dz * dz)) >> 8;
+    const bool aggressive_wave = g_wave_aggressive;
+
+    // 攻撃フェーズへ移ってから、攻撃態勢へコミットした時、または攻撃距離へ
+    // 初めて入った時だけ接近警告を鳴らす。遠巻きフェーズでは、近くを通過しても
+    // 攻撃予告を出さない。境界付近での行き来による連打も避ける。
+    if (aggressive_wave && !e.approach_warning_played &&
+        (e.mode == EnemyMode::Attack ||
+         dist_m <= static_cast<uint32_t>(tuning.attack_distance_m))) {
+        e.approach_warning_played = true;
+        play_game_sfx(audio::Sfx::EnemyApproach);
+    } else if (e.approach_warning_played &&
+               dist_m > static_cast<uint32_t>(
+                   tuning.attack_distance_m + kApproachWarningResetMarginM)) {
+        e.approach_warning_played = false;
+    }
 
     // ミサイルに狙われたら回避（Bomber は回避運動をしない鈍重な機体）
     if (e.mode != EnemyMode::Evade && stats.can_evade && missile_targets(idx)) {
@@ -1127,9 +1233,30 @@ void update_enemy(int idx) {
         const bool close_pressure =
             tuning.aggression_level >= 4 &&
             dist_m < static_cast<uint32_t>(tuning.fire_distance_m);
-        if (dist_m > 2500) {
+        const bool committed_attack = e.mode == EnemyMode::Attack;
+        if (!aggressive_wave) {
+            // 遠巻きフェーズでは、距離や乱数に関係なくAttackへ入れない。
+            if (r < 65) {
+                e.mode = EnemyMode::Turn;
+                e.turn_dir = (fm::rnd() & 1) ? 1 : -1;
+                e.timer = static_cast<int16_t>(fm::rnd_range(30, 80));
+            } else {
+                e.mode = EnemyMode::Cruise;
+                e.timer = static_cast<int16_t>(fm::rnd_range(
+                    tuning.spawn_timer_min, tuning.spawn_timer_max));
+            }
+        } else if (e.mode == EnemyMode::Evade) {
+            // 回避が終わった後も、Waveが攻撃フェーズなら遠巻き巡航へ
+            // 戻さず、直ちに追跡へ復帰させる。
+            e.mode = EnemyMode::Attack;
+            e.timer = static_cast<int16_t>(fm::rnd_range(
+                tuning.attack_timer_min, tuning.attack_timer_max));
+        } else if (dist_m > 2500 || committed_attack) {
             e.mode = EnemyMode::Attack;  // 離れすぎ → 追跡して戻る
-            e.timer = 90;
+            e.timer = committed_attack
+                ? static_cast<int16_t>(fm::rnd_range(
+                    tuning.attack_timer_min, tuning.attack_timer_max))
+                : 90;
         } else if ((static_cast<int>(r) < attack_th || close_pressure) &&
                    dist_m < static_cast<uint32_t>(tuning.attack_distance_m)) {
             e.mode = EnemyMode::Attack;
@@ -1141,15 +1268,25 @@ void update_enemy(int idx) {
             e.timer = static_cast<int16_t>(fm::rnd_range(30, 80));
         } else {
             e.mode = EnemyMode::Cruise;
-            e.timer = static_cast<int16_t>(fm::rnd_range(40, 110));
+            e.timer = static_cast<int16_t>(fm::rnd_range(
+                tuning.spawn_timer_min, tuning.spawn_timer_max));
         }
     }
 
     switch (e.mode) {
         case EnemyMode::Cruise:
-            break;
         case EnemyMode::Turn:
-            e.yaw_q8 = static_cast<uint16_t>(e.yaw_q8 + e.turn_dir * 180);
+            if (!aggressive_wave &&
+                dist_m < static_cast<uint32_t>(tuning.attack_distance_m)) {
+                // 遠巻きフェーズで近づきすぎた機体は、自機から離れる向きへ
+                // ゆっくり機首を向けて、一定距離を保つ。
+                const uint8_t bearing = fm::atan2_brad(
+                    static_cast<int32_t>(dx >> 8), static_cast<int32_t>(dz >> 8));
+                const uint8_t away = static_cast<uint8_t>(bearing + 128u);
+                steer_enemy_towards(e, away, tuning.attack_turn_step_q8);
+            } else if (e.mode == EnemyMode::Turn) {
+                e.yaw_q8 = static_cast<uint16_t>(e.yaw_q8 + e.turn_dir * 180);
+            }
             break;
         case EnemyMode::Attack: {
             const uint8_t bearing = fm::atan2_brad(
@@ -1181,10 +1318,16 @@ void update_enemy(int idx) {
 
     // 前進
     const uint8_t yaw = static_cast<uint8_t>(e.yaw_q8 >> 8);
+    int32_t move_speed_q8 = e.speed_q8;
+    if (e.mode == EnemyMode::Attack &&
+        move_speed_q8 < kEnemyAttackMinSpeedM * kQ8) {
+        // 直進する自機の後ろに出た機体も、攻撃態勢なら追いつけるようにする。
+        move_speed_q8 = kEnemyAttackMinSpeedM * kQ8;
+    }
     e.x += static_cast<int32_t>(
-        (static_cast<int64_t>(e.speed_q8) * fm::sin_q12(yaw)) >> 12) / 30;
+        (static_cast<int64_t>(move_speed_q8) * fm::sin_q12(yaw)) >> 12) / 30;
     e.z += static_cast<int32_t>(
-        (static_cast<int64_t>(e.speed_q8) * fm::cos_q12(yaw)) >> 12) / 30;
+        (static_cast<int64_t>(move_speed_q8) * fm::cos_q12(yaw)) >> 12) / 30;
 
     // 攻撃（プレイヤーが正面コーンに入っていれば、まず予告してから射撃）
     if (e.fire_cd > 0) {
@@ -1229,6 +1372,7 @@ void update_enemy(int idx) {
             }
         } else if (e.fire_cd == 0) {
             e.warning_timer = kAttackWarningFrames;
+            play_game_sfx(audio::Sfx::EnemyGunWarning);
         }
     }
 
@@ -1240,9 +1384,44 @@ void update_enemy(int idx) {
         collision_dx * collision_dx + dy * dy + collision_dz * collision_dz);
     const uint64_t rr = static_cast<uint64_t>(25 * kQ8) * (25 * kQ8);
     if (d2 < rr) {
-        e.alive = false;
-        spawn_explosion(e.x, e.y, e.z);
-        g_score += stats.score / 2;
+        // 攻撃機が高速化しても、体当たりだけで敵残機が減ると
+        // 「撃っていないのに敵が消える」ように見えてしまう。敵は撃墜せず、
+        // いったん自機から離脱させて再攻撃させる。
+        const uint32_t distance_q8 = fm::isqrt64(d2);
+        constexpr int32_t kCollisionSeparationQ8 = 60 * kQ8;
+        if (distance_q8 > 0) {
+            e.x = g_pl.x - static_cast<int32_t>(
+                collision_dx * kCollisionSeparationQ8 / distance_q8);
+            e.y = g_pl.y - static_cast<int32_t>(
+                dy * kCollisionSeparationQ8 / distance_q8);
+            e.z = g_pl.z - static_cast<int32_t>(
+                collision_dz * kCollisionSeparationQ8 / distance_q8);
+        } else {
+            const uint8_t away = static_cast<uint8_t>(
+                static_cast<uint8_t>(e.yaw_q8 >> 8) + 128u);
+            e.x = g_pl.x + static_cast<int32_t>(
+                (static_cast<int64_t>(kCollisionSeparationQ8) *
+                 fm::sin_q12(away)) >> 12);
+            e.y = g_pl.y;
+            e.z = g_pl.z + static_cast<int32_t>(
+                (static_cast<int64_t>(kCollisionSeparationQ8) *
+                 fm::cos_q12(away)) >> 12);
+        }
+        if (e.y < 80 * kQ8) {
+            e.y = 80 * kQ8;
+        }
+        if (e.y > 3200 * kQ8) {
+            e.y = 3200 * kQ8;
+        }
+        e.yaw_q8 = static_cast<uint16_t>(fm::atan2_brad(
+            static_cast<int32_t>((e.x - g_pl.x) >> 8),
+            static_cast<int32_t>((e.z - g_pl.z) >> 8))) << 8;
+        e.mode = EnemyMode::Evade;
+        e.turn_dir = (fm::rnd() & 1) ? 1 : -1;
+        e.timer = 90;
+        e.fire_cd = static_cast<int16_t>(tuning.fire_cooldown_frames);
+        e.warning_timer = 0;
+        e.approach_warning_played = true;
         set_msg("MIDAIR COLLISION!");
         apply_player_damage(stats.collision_dmg, DeathReason::Collision);
         g_pl.dmg_flash = 12;
@@ -1341,13 +1520,26 @@ void update_explosions() {
 void update_play() {
     ++g_play_tick;
 
+    if (g_wave_clear_timer > 0) {
+        --g_wave_clear_timer;
+        if (g_wave_clear_timer == 0) {
+            start_wave(g_wave + 1);
+            // 新しいウェーブの敵も生成直後のフレームから同じ投影キャッシュを使う。
+            update_camera_transform();
+            refresh_enemy_projection();
+            update_guidance_target();
+        }
+        return;
+    }
 
+    ++g_wave_elapsed_frames;
     update_player_motion();
     if (g_death_reason != DeathReason::None) {
         finalize_gameover();
         return;
     }
 
+    update_wave_aggression();
     for (int i = 0; i < kMaxEnemies; ++i) {
         update_enemy(i);
         if (g_death_reason != DeathReason::None) {
@@ -1361,10 +1553,6 @@ void update_play() {
     update_camera_transform();
     refresh_enemy_projection();
     update_player_weapons();
-    if (g_death_reason != DeathReason::None) {
-        finalize_gameover();
-        return;
-    }
 
     update_missiles();
     update_explosions();
@@ -1388,12 +1576,22 @@ void update_play() {
             break;
         }
     }
-    if (!any_alive && g_banner_timer == 0) {
+    if (!any_alive) {
         g_score += 200;  // ウェーブクリアボーナス
-        start_wave(g_wave + 1);
-        // 新しいウェーブの敵も生成直後のフレームから同じ投影キャッシュを使う。
-        update_camera_transform();
-        refresh_enemy_projection();
+        g_wave_clear_wave = g_wave;
+        g_wave_clear_timer = kWaveClearFrames;
+        // クリアファンファーレを聞き取りやすくするため、面間の静止画面では
+        // エンジン音を止める。次Waveの通常更新で操作に応じて再開する。
+        audio::set_engine(0);
+        play_game_sfx(audio::Sfx::WaveClear);
+        return;
+    }
+
+    // 最後の敵を倒したフレームはWaveクリアを優先して次Waveの補給へ進める。
+    // 敵が残っている状態で両方の弾が尽きた場合だけ、弾切れゲームオーバーにする。
+    check_ammo_depleted();
+    if (g_death_reason != DeathReason::None) {
+        finalize_gameover();
     }
 }
 
@@ -1666,8 +1864,8 @@ void render_background() {
         int sy;
         apply_roll(sx0, sy0, &sx, &sy);
         if (sy > -8 && sy < gfx::kHeight + 8) {
-            gfx::fill_circle(sx, sy, 6, gfx::rgb(255, 244, 190));
-            gfx::fill_circle(sx, sy, 4, kColWhite);
+            gfx::fill_circle(sx, sy, 6, kColSunGlow);
+            gfx::fill_circle(sx, sy, 4, kColSun);
         }
     }
 }
@@ -2228,6 +2426,8 @@ void render_hud() {
     gfx::text(3, 3, buf, kColHudGreen);
     std::snprintf(buf, sizeof(buf), "WAVE %d", g_wave);
     gfx::text(160 - 3 - gfx::text_width(buf), 3, buf, kColHudGreen);
+    std::snprintf(buf, sizeof(buf), "ENEMY %d", living_enemy_count());
+    gfx::text(160 - 3 - gfx::text_width(buf), 11, buf, kColYellow);
 
     const int spd_kmh = static_cast<int>(
         (static_cast<int64_t>(g_pl.speed_q8) * 36) / (10 * kQ8));
@@ -2236,6 +2436,8 @@ void render_hud() {
     std::snprintf(buf, sizeof(buf), "ALT %4ld", static_cast<long>(g_pl.y >> 8));
     gfx::text(42, 153, buf, kColHudGreen);
 
+    std::snprintf(buf, sizeof(buf), "GUN%3d", g_pl.gun_ammo);
+    gfx::text(3, 146, buf, kColYellow);
     std::snprintf(buf, sizeof(buf), "MSL %2d", g_pl.missiles);
     gfx::text(118, 146, buf, kColYellow);
     // HP バー
@@ -2275,7 +2477,27 @@ void dim_framebuffer() {
     }
 }
 
+void render_wave_clear() {
+    // 次Waveを生成するまでの短い間、画面全体を明るい青で静止表示する。
+    // 明滅は撃墜演出と似てしまうため行わず、枠とアクセントで祝賀感を出す。
+    gfx::clear(kColWaveClear);
+    gfx::fill_rect(18, 20, gfx::kWidth - 36, 3, kColWaveClearAccent);
+    gfx::fill_rect(18, 137, gfx::kWidth - 36, 3, kColWaveClearAccent);
+    gfx::rect_outline(5, 5, gfx::kWidth - 10, gfx::kHeight - 10, kColWhite);
+    gfx::text(kCx - gfx::text_width("WAVE CLEAR", 2) / 2, 54,
+              "WAVE CLEAR", kColWhite, 2);
+    char buf[24];
+    std::snprintf(buf, sizeof(buf), "WAVE %d", g_wave_clear_wave);
+    gfx::text(kCx - gfx::text_width(buf) / 2, 78, buf, kColYellow);
+    std::snprintf(buf, sizeof(buf), "NEXT WAVE %d", g_wave_clear_wave + 1);
+    gfx::text(kCx - gfx::text_width(buf) / 2, 92, buf, kColWhite);
+}
+
 void render_play() {
+    if (g_wave_clear_timer > 0) {
+        render_wave_clear();
+        return;
+    }
     render_background();
     render_entities();
     render_player_plane();
@@ -2342,6 +2564,7 @@ const char* death_reason_label(DeathReason reason) {
         case DeathReason::Crash: return "CRASH";
         case DeathReason::Collision: return "COLLISION";
         case DeathReason::ShotDown: return "SHOT DOWN";
+        case DeathReason::OutOfAmmo: return "OUT OF AMMO";
         case DeathReason::None:
         default: return "UNKNOWN";
     }

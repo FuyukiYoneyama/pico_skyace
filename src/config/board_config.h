@@ -28,10 +28,11 @@ constexpr uint8_t kKeyboardI2cAddress = 0x1f;
 constexpr unsigned kAudioPwmLeft = 26;
 constexpr unsigned kAudioPwmRight = 27;
 
-// 実機動作確認済みの参照実装と同じ値。
-// 250 MHz sysclk / (2 * kPioClkDiv) = 62.5 MHz 相当。
+// LCD は基板や電源再投入の状態によって高速 PIO 転送のマージンが変わる。
+// 250 MHz sysclk では、実効 31.25 MHz 相当まで落として安定性を優先する。
+// （SPI bit rate = sysclk / (2 * kLcdPioClkDiv)）
 constexpr uint32_t kSysClockKhz = 250000;
-constexpr float kLcdPioClkDiv = 2.0f;
+constexpr float kLcdPioClkDiv = 4.0f;
 
 }  // namespace skyace::board
 

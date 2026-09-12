@@ -64,8 +64,12 @@ enum class Sfx : uint8_t {
     Explosion,  // 爆発: ノイズ主体の低い唸り、長め
     Hit,        // 被弾: 短い低いバズ
     LockOn,     // ロックオン成立: 短いクリーンな上昇気味のビープ
+    EnemyApproach,   // 敵接近: 音程のある電子ブザー
+    EnemyGunWarning, // 敵機銃の発射準備: ロック中の連続高音
+    WaveClear,  // 面クリア: 明るい上昇音の短いファンファーレ
 };
-// 単発効果音を鳴らす（1音同時、既存のSFXがあれば上書きする）。
+// 単発効果音を鳴らす（1音同時）。重要度の低いSFXは、警告・被弾音の再生中は
+// 上書きしない。
 void play_sfx(Sfx sfx);
 
 }  // namespace skyace::audio

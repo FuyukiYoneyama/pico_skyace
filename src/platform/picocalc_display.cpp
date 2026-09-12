@@ -1,7 +1,7 @@
 // このファイルは薄いアダプタに徹する。実際の LCD 制御は
 // platform/lcd_rgb565_pio.cpp（著者の他プロジェクトで実機動作確認済みの
-// 実装を無改変でコピーしたもの）が行う。独自の再実装をやめ、検証済み
-// ファイルをそのまま呼ぶことで、書き写しミスの可能性を排除する。
+// 転送実装をベースに、PicoCalc個体差へ向けた保守的なクロック／リセット設定を
+// 適用したもの）が行う。アダプタは公開APIを呼ぶだけに留める。
 #include "platform/picocalc_display.h"
 
 #include <cstdio>
@@ -12,7 +12,8 @@ namespace skyace::display {
 
 void init() {
     lcd_rgb565_pio_init(false);  // DMA なし。参照実装の blocking モードと同じ
-    std::printf("DISPLAY init ok (verified lcd_rgb565_pio driver, blocking mode)\n");
+    std::printf("DISPLAY init ok (verified lcd_rgb565_pio driver, blocking mode, "
+                "clkdiv=4.00, spi=31.25MHz, reset=10/10/200ms)\n");
 }
 
 void clear_black() {

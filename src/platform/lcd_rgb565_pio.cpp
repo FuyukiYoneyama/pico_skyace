@@ -6,6 +6,7 @@
 #include "hardware/dma.h"
 #include "hardware/gpio.h"
 #include "hardware/pio.h"
+#include "config/board_config.h"
 #include "pico/stdlib.h"
 #include "lcd_spi_min.pio.h"
 
@@ -20,8 +21,6 @@ constexpr uint kPinRamCs = 21;
 constexpr int kWidth = 320;
 constexpr int kHeight = 320;
 constexpr int kMaxPixels = 320 * 16;
-constexpr float kPioClkDiv = 2.0f;
-
 PIO g_pio = pio0;
 uint g_sm = 0;
 uint g_offset = 0;
@@ -79,12 +78,15 @@ void write_commandn(uint8_t cmd, const uint8_t* data, size_t len) {
 }
 
 void reset_panel() {
+    // 電源再投入直後や前アプリのハング後は、パネル側の内部状態が
+    // すぐにはリセット完了しない個体がある。ClockCalc などの実働
+    // ハードウェア経路に合わせ、解除後に十分な待ち時間を確保する。
     gpio_put(kPinRst, 1);
-    sleep_ms(1);
+    sleep_ms(10);
     gpio_put(kPinRst, 0);
     sleep_ms(10);
     gpio_put(kPinRst, 1);
-    sleep_ms(10);
+    sleep_ms(200);
 }
 
 void init_gpio_pio() {
@@ -105,7 +107,8 @@ void init_gpio_pio() {
     gpio_put(kPinRamCs, 1);
 
     g_offset = pio_add_program(g_pio, &lcd_spi_min_program);
-    lcd_spi_min_program_init(g_pio, g_sm, g_offset, kPinMosi, kPinSck, kPioClkDiv);
+    lcd_spi_min_program_init(g_pio, g_sm, g_offset, kPinMosi, kPinSck,
+                             skyace::board::kLcdPioClkDiv);
     g_ready = true;
 }
 

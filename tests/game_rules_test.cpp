@@ -119,11 +119,29 @@ void test_enemy_wave_pressure_ramps() {
            "later waves move faster");
 }
 
+void test_enemy_aggression_trigger() {
+    expect(!rules::should_begin_aggressive_attack(5, 5, 0),
+           "a fresh wave starts in the distant cruise phase");
+    expect(!rules::should_begin_aggressive_attack(3, 5, 600),
+           "exactly twenty seconds does not trigger aggression by time alone");
+    expect(rules::should_begin_aggressive_attack(3, 5, 601),
+           "aggression starts after twenty seconds");
+    expect(!rules::should_begin_aggressive_attack(3, 5, 0),
+           "more than half of the wave remaining keeps the distant phase");
+    expect(rules::should_begin_aggressive_attack(2, 5, 0),
+           "half or fewer enemies triggers aggression");
+    expect(rules::should_begin_aggressive_attack(0, 5, 0),
+           "zero remaining enemies satisfies the count threshold");
+    expect(!rules::should_begin_aggressive_attack(0, 0, 601),
+           "an unstarted wave cannot trigger aggression");
+}
+
 int main() {
     test_damage_latches_first_death_reason();
     test_target_generation();
     test_input_hold_is_blocked_until_release();
     test_rng_reproducibility_and_separation();
     test_enemy_wave_pressure_ramps();
+    test_enemy_aggression_trigger();
     return g_failures == 0 ? 0 : 1;
 }

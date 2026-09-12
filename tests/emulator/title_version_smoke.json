@@ -7,8 +7,14 @@
     {
       "op": "wait_until",
       "label": "firmware initialized",
-      "condition": {"kind": "uart_contains", "text": "pico_skyace version 0.9.3"},
+      "condition": {"kind": "uart_contains", "text": "pico_skyace version 0.9.4"},
       "timeout_ms": 3000
+    },
+    {
+      "op": "wait_until",
+      "label": "LCD and backlight initialized",
+      "condition": {"kind": "uart_contains", "text": "BACKLIGHT set level=220 ok=1"},
+      "timeout_ms": 10000
     },
     {"op": "wait", "ms": 500},
     {"op": "snapshot", "png": "title-version.png"},

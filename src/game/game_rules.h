@@ -6,7 +6,13 @@
 namespace skyace::game_rules {
 
 // 出撃結果に記録する敗因。None はまだ生存中を表す。
-enum class DeathReason : uint8_t { None, ShotDown, Crash, Collision };
+enum class DeathReason : uint8_t {
+    None,
+    ShotDown,
+    Crash,
+    Collision,
+    OutOfAmmo,
+};
 
 struct RunResult {
     int score;
@@ -62,6 +68,12 @@ DamageResult apply_damage(int hp, DeathReason current_reason, int amount,
 // 返す。Wave 1は従来値を基準にし、以降は最大8段階まで強める。
 EnemyWaveTuning enemy_wave_tuning(int wave, int attack_bias, int fire_cd,
                                   int hit_pct);
+
+// ウェーブ開始直後の遠巻き状態から、敵が一斉に攻撃へ移る条件。
+// ゲーム更新は約30fpsなので、20秒ちょうど（600フレーム）は含めず、
+// 残敵が開始時の半分以下、または20秒を超えた時点でtrueにする。
+bool should_begin_aggressive_attack(int living_enemies, int wave_enemies,
+                                    uint32_t wave_elapsed_frames);
 
 // 敵の基礎速度にWave補正を適用する。戻り値はQ8 m/s。
 int32_t scale_enemy_speed(int32_t speed_q8, int wave);

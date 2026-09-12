@@ -64,9 +64,9 @@ supported target until separately tested.
 - [ ] Verify the final UF2 on an actual standard RP2040 PicoCalc: cold boot,
       LCD, keyboard, simultaneous input, BGM/SFX/engine audio, SD screenshot
       success and no-card recovery, and power-cycle recovery. Repeat the smoke
-      test above after the deferred 1.0.0 final build; the current v0.9.3
-      report does not identify the not-yet-built final UF2 and predates the
-      unreleased Wave aggression tuning.
+      test above after the deferred 1.0.0 final build; the current v0.9.4
+      development build still requires a fresh hardware check for the revised
+      Wave aggression, Wave 4 demo start, and sun color.
 - [x] User-reported 20-minute upper-load play run completed without issue on
       2026-09-10. This is a manual stability-acceptance record; the tested
       UF2 hash, UART log, and exact run metadata were not supplied.

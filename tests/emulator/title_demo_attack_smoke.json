@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "name": "pico-skyace-title-demo-attack-smoke",
-  "description": "Wait for the 30-second title timeout and confirm the real-play demo HUD renders.",
+  "description": "Wait for the 30-second title timeout, confirm the real-play demo starts at Wave 4, and verify its HUD renders.",
   "poll_ms": 10,
   "steps": [
     {
@@ -15,6 +15,12 @@
       "label": "title enters demo after 30 seconds",
       "condition": {"kind": "uart_contains", "text": "MODE Title->Demo"},
       "timeout_ms": 33000
+    },
+    {
+      "op": "wait_until",
+      "label": "demo starts at Wave 4",
+      "condition": {"kind": "uart_contains", "text": "WAVE START wave=4 enemies=5"},
+      "timeout_ms": 1000
     },
     {"op": "wait", "ms": 500},
     {"op": "snapshot", "png": "demo-attack.png"},

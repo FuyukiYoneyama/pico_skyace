@@ -269,8 +269,17 @@ int32_t drum_render() {
     return (sample * static_cast<int32_t>(env)) / 255;
 }
 
-// --- 単発効果音: トーン(開始→終了周波数のスウィープ)とノイズを混ぜ、
-// 線形エンベロープで減衰させる ---
+// --- 単発効果音: 通常音はトーンとノイズのスウィープ、警告音は
+// 電子ブザー／ロック連続音の明瞭な矩形波として合成する ---
+constexpr uint8_t kSfxStyleSweep = 0;
+constexpr uint8_t kSfxStyleBuzzer = 1;
+constexpr uint8_t kSfxStyleLockTone = 2;
+constexpr uint8_t kSfxStyleClear = 3;
+constexpr uint32_t kSfxBuzzerPeriodSamples =
+    (kSampleRateHz * 180u) / 1000u;  // 約5.5Hzのブー・ブー・ブー
+constexpr uint32_t kSfxBuzzerOnSamples =
+    (kSampleRateHz * 95u) / 1000u;   // 1周期の前半だけ鳴らす
+
 struct SfxState {
     volatile bool active;
     uint32_t samples_left;
@@ -280,6 +289,8 @@ struct SfxState {
     uint32_t tone_phase;
     uint8_t noise_mix;   // 0..255: ノイズ成分の比率
     uint8_t volume;      // 0..255: 開始音量（エンベロープの初期値）
+    uint8_t priority;    // 大きいほど重要。再生中の低優先度SFXを抑制する。
+    uint8_t style;       // sweep=通常、buzzer/lock-tone=警告、clear=面クリア
 };
 volatile SfxState g_sfx = {};
 
@@ -309,20 +320,57 @@ bool timer_callback(repeating_timer_t*) {
     if (g_sfx.active) {
         const uint32_t total = g_sfx.samples_total;
         const uint32_t elapsed = total - g_sfx.samples_left;
-        const int32_t delta = static_cast<int32_t>(g_sfx.freq_end) -
-                              static_cast<int32_t>(g_sfx.freq_start);
-        const uint32_t freq = static_cast<uint32_t>(
-            static_cast<int32_t>(g_sfx.freq_start) +
-            (delta * static_cast<int32_t>(elapsed)) / static_cast<int32_t>(total));
+        uint32_t freq;
+        bool tone_enabled = true;
+        if (g_sfx.style == kSfxStyleBuzzer) {
+            // 低いブー音を短く鳴らして休む。ノイズを足さず、航空機の
+            // 接近ブザーらしい「ブー、ブー、ブー」にする。
+            const uint32_t phase = elapsed % kSfxBuzzerPeriodSamples;
+            tone_enabled = phase < kSfxBuzzerOnSamples;
+            freq = g_sfx.freq_start;
+        } else if (g_sfx.style == kSfxStyleLockTone) {
+            // ロック成立時は音程を動かさない連続した高音にする。
+            freq = g_sfx.freq_start;
+        } else if (g_sfx.style == kSfxStyleClear) {
+            // クリア時は短い上昇アルペジオ。ノイズを混ぜず、撃墜音と
+            // 区別できる明るい4音のファンファーレにする。
+            constexpr uint32_t kClearNotes[] = {523u, 659u, 784u, 1047u};
+            const uint32_t note_total = total / 4u;
+            uint32_t note = note_total > 0 ? elapsed / note_total : 0;
+            if (note >= 4u) {
+                note = 3u;
+            }
+            freq = kClearNotes[note];
+        } else {
+            const int32_t delta = static_cast<int32_t>(g_sfx.freq_end) -
+                                  static_cast<int32_t>(g_sfx.freq_start);
+            freq = static_cast<uint32_t>(
+                static_cast<int32_t>(g_sfx.freq_start) +
+                (delta * static_cast<int32_t>(elapsed)) /
+                    static_cast<int32_t>(total));
+        }
         const uint32_t step = (freq << 16) / kSampleRateHz;
         g_sfx.tone_phase += step;
         const bool high = (g_sfx.tone_phase & 0xffffu) < 0x8000u;
-        const int32_t tone = high ? 100 : -100;
+        const int32_t tone = tone_enabled ? (high ? 100 : -100) : 0;
         const int32_t noise = next_noise();
         const uint8_t noise_mix = g_sfx.noise_mix;
         const int32_t sample =
             (tone * (255 - noise_mix) + noise * noise_mix) / 255;
-        const uint32_t env = (g_sfx.samples_left * g_sfx.volume) / total;
+        uint32_t env;
+        if (g_sfx.style == kSfxStyleBuzzer ||
+            g_sfx.style == kSfxStyleLockTone) {
+            // 警告中は音量を保ち、末尾だけ素早く落として緊張感を残す。
+            const uint32_t release_start = (total * 3u) / 4u;
+            if (elapsed < release_start) {
+                env = g_sfx.volume;
+            } else {
+                const uint32_t release_total = total - release_start;
+                env = ((total - elapsed) * g_sfx.volume) / release_total;
+            }
+        } else {
+            env = (g_sfx.samples_left * g_sfx.volume) / total;
+        }
         mix += (sample * static_cast<int32_t>(env)) / 255;
 
         --g_sfx.samples_left;
@@ -366,17 +414,24 @@ bool timer_callback(repeating_timer_t*) {
 }
 
 void trigger(uint32_t freq_start, uint32_t freq_end, uint32_t ms,
-             uint8_t noise_mix, uint8_t volume) {
+             uint8_t noise_mix, uint8_t volume, uint8_t priority,
+             uint8_t style) {
     uint32_t samples_total = (kSampleRateHz * ms) / 1000u;
     if (samples_total == 0) {
         samples_total = 1;
     }
     const uint32_t save = save_and_disable_interrupts();
+    if (g_sfx.active && priority < g_sfx.priority) {
+        restore_interrupts(save);
+        return;
+    }
     g_sfx.freq_start = freq_start;
     g_sfx.freq_end = freq_end;
     g_sfx.tone_phase = 0;
     g_sfx.noise_mix = noise_mix;
     g_sfx.volume = volume;
+    g_sfx.priority = priority;
+    g_sfx.style = style;
     g_sfx.samples_total = samples_total;
     g_sfx.samples_left = samples_total;
     g_sfx.active = true;
@@ -447,19 +502,31 @@ void music_stop() {
 void play_sfx(Sfx sfx) {
     switch (sfx) {
         case Sfx::Gun:
-            trigger(1200, 500, 40, 150, 220);
+            trigger(1200, 500, 40, 150, 220, 0, kSfxStyleSweep);
             break;
         case Sfx::Missile:
-            trigger(700, 150, 350, 120, 220);
+            trigger(700, 150, 350, 120, 220, 1, kSfxStyleSweep);
             break;
         case Sfx::Explosion:
-            trigger(300, 50, 500, 230, 255);
+            trigger(300, 50, 500, 230, 255, 3, kSfxStyleSweep);
             break;
         case Sfx::Hit:
-            trigger(180, 90, 150, 200, 220);
+            trigger(180, 90, 150, 200, 220, 5, kSfxStyleSweep);
             break;
         case Sfx::LockOn:
-            trigger(1400, 2000, 90, 20, 200);
+            trigger(1500, 1500, 180, 0, 220, 1, kSfxStyleLockTone);
+            break;
+        case Sfx::EnemyApproach:
+            // 低い音を断続させる電子ブザーで、接近を知らせる。
+            trigger(360, 360, 600, 0, 255, 2, kSfxStyleBuzzer);
+            break;
+        case Sfx::EnemyGunWarning:
+            // 発射準備（敵のロック）は音程を動かさない連続高音で知らせる。
+            trigger(1450, 1450, 700, 0, 255, 4, kSfxStyleLockTone);
+            break;
+        case Sfx::WaveClear:
+            // クリア画面と同時に鳴る、明るい上昇4音。
+            trigger(523, 1047, 360, 0, 235, 6, kSfxStyleClear);
             break;
     }
 }
