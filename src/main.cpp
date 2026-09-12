@@ -12,6 +12,36 @@
 #ifndef PICO_SKYACE_VERSION_STRING
 #define PICO_SKYACE_VERSION_STRING "0.0.0-dev"
 #endif
+#ifndef PICO_SKYACE_BUILD_ID
+#define PICO_SKYACE_BUILD_ID "unknown"
+#endif
+
+namespace {
+
+// 電源投入時は、RP2040がUARTを初期化してからCH340とホスト側COMポートの
+// 再認識が完了するまで時間差がある。UARTにはホストの接続状態を問い合わせる
+// 手段がないため、最初の識別行を送る前に短い整定時間を設ける。
+constexpr uint32_t kBootUartSettleMs = 500;
+
+// Keep the binary identity on one machine-readable line.  The line is emitted
+// before any peripheral initialization and is flushed explicitly so a boot log
+// can identify the firmware even when a later initialization step fails.
+void log_boot_identity(const char* phase, bool watchdog_reboot, bool clock_ok) {
+    std::printf(
+        "PICO_SKYACE_BOOT app=pico_skyace version=%s build=\"%s\" "
+        "WATCHDOG_CAUSED_REBOOT=%d clock_ok=%d sysclk_target_khz=%lu "
+        "sysclk_actual_khz=%lu uart_baud=115200 phase=%s\r\n",
+        PICO_SKYACE_VERSION_STRING,
+        PICO_SKYACE_BUILD_ID,
+        watchdog_reboot ? 1 : 0,
+        clock_ok ? 1 : 0,
+        static_cast<unsigned long>(skyace::board::kSysClockKhz),
+        static_cast<unsigned long>(clock_get_hz(clk_sys) / 1000),
+        phase);
+    stdio_flush();
+}
+
+}  // namespace
 
 int main() {
     const bool watchdog_reboot = watchdog_caused_reboot();
@@ -21,10 +51,14 @@ int main() {
     // 完全に安定するまで猶予を置く（set_sys_clock_khz の直後に 100ms 待って
     // から display::init() を呼ぶ）。
     stdio_init_all();
+    // 電源起動時のCH340/COM列挙を待ってから、取得対象の先頭行を送る。
+    // UF2ローダー経由ではCOMが既に列挙済みだが、電源再投入ではこの待ちが必要。
+    sleep_ms(kBootUartSettleMs);
+    log_boot_identity("stdio", watchdog_reboot, clock_ok);
     sleep_ms(100);
 
     std::printf("pico_skyace version %s\r\n", PICO_SKYACE_VERSION_STRING);
-    std::printf("BUILD ID time=\"%s %s\"\r\n", __DATE__, __TIME__);
+    std::printf("BUILD ID id=\"%s\"\r\n", PICO_SKYACE_BUILD_ID);
     // ハング/フリーズ切り分け用。前回起動がウォッチドッグ復帰なら、
     // 画面が固まって自動リセットされたことが分かる。
     std::printf("WATCHDOG_CAUSED_REBOOT=%d\r\n", watchdog_reboot ? 1 : 0);

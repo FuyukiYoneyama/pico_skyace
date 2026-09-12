@@ -7,10 +7,26 @@
 #include <cstdio>
 
 #include "platform/lcd_rgb565_pio.h"
+#include "pico/stdlib.h"
+
+#ifndef PICO_SKYACE_VERSION_STRING
+#define PICO_SKYACE_VERSION_STRING "0.0.0-dev"
+#endif
+#ifndef PICO_SKYACE_BUILD_ID
+#define PICO_SKYACE_BUILD_ID "unknown"
+#endif
 
 namespace skyace::display {
 
 void init() {
+    // Keep an identity marker at the first observable peripheral boundary as
+    // well as in main().  This matters on a cold boot where the UART capture
+    // can begin while the early clock/stdio setup is still settling: the first
+    // line that survives must still identify the game and firmware revision.
+    std::printf("PICO_SKYACE_BOOT app=pico_skyace version=%s build=\"%s\" "
+                "phase=display\r\n",
+                PICO_SKYACE_VERSION_STRING, PICO_SKYACE_BUILD_ID);
+    stdio_flush();
     lcd_rgb565_pio_init(false);  // DMA なし。参照実装の blocking モードと同じ
     std::printf("DISPLAY init ok (verified lcd_rgb565_pio driver, blocking mode, "
                 "clkdiv=4.00, spi=31.25MHz, reset=10/10/200ms)\n");

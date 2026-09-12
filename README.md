@@ -116,7 +116,8 @@ mkdir -p "$out/snapshots"
 `report.json` の `verdict.status` と `scenario.status` が `pass` であること、
 `exception`・`unsupported_mmio`・キーボードdropがないことを確認します。これは登録targetの
 正式回帰判定ではなく、新規BINの診断実行です。実行シナリオと保存済み結果は、最新の
-[`v0.9.16 検証ビルド記録`](docs/validation/2026-09-12-v0.9.16/BUILD.md)（以前の記録は
+[`v0.9.18 検証ビルド記録`](docs/validation/2026-09-12-v0.9.18/BUILD.md)（以前の記録は
+[`v0.9.17 ビルド記録`](docs/validation/2026-09-12-v0.9.17/BUILD.md)、
 [`v0.9.13 ビルド記録`](docs/validation/2026-09-12-v0.9.13/BUILD.md)、
 [`v0.9.12 ビルド記録`](docs/validation/2026-09-12-v0.9.12/BUILD.md)、
 [`v0.9.11 ビルド記録`](docs/validation/2026-09-12-v0.9.11/BUILD.md)、
@@ -158,9 +159,14 @@ CS（チップセレクト）を長時間下げっぱなしにする連続バー
 
 ## ログ
 
-UART0（USB-C の CH340 経由）、115200 bps 8N1。起動時に version / build id /
-sysclk / backlight / 直前がウォッチドッグ復帰だったか(`WATCHDOG_CAUSED_REBOOT`)
-を出力する。プレイ中は `WAVE START` / `SPAWN`（敵タイプ含む）/ `MODE` 遷移も
+UART0（USB-C の CH340 経由）、115200 bps 8N1。起動時の version / build id /
+sysclk / 直前がウォッチドッグ復帰だったか(`WATCHDOG_CAUSED_REBOOT`)は
+`PICO_SKYACE_BOOT`の1行へまとめ、UART初期化後にCH340/ホスト側COMの再認識を
+待つ500msの整定時間を置いてからflushして出力する。UARTにはホストの接続状態を
+問い合わせる手段がないため、固定の上限待ちで取りこぼしを抑える。
+backlightの状態は従来どおり別の起動行で出力する。
+LCD初期化境界でもゲーム名・version・buildを再出力する。従来の起動行も互換性のため
+続けて出力する。プレイ中は `WAVE START` / `SPAWN`（敵タイプ含む）/ `MODE` 遷移も
 出力するので、フリーズ/黒画面が起きた場合は UART ログの最後の行が手がかりに
 なる。ゲームループは 3 秒ごとにウォッチドッグを蹴っており、フリーズすると
 自動リセットして次回起動ログに `WATCHDOG_CAUSED_REBOOT=1` が出る。
@@ -202,7 +208,7 @@ third_party/
 `VERSION` ファイルで管理（major.minor.patch）。ソース挙動が変わるビルドを
 PicoCalc向けソースを1行でも変更した場合は、内部診断・ビルド設定を含めて例外なく
 `VERSION`の数値を上げる。同じ版番号のUF2を複数配布しない。現在のバージョンは
-`0.9.16` で、タイトル画面の
+`0.9.18` で、タイトル画面の
 `VERSION` 表示と起動時UARTログに反映される。
 
 ## 注記

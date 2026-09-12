@@ -31,6 +31,12 @@ supported target until separately tested.
       The diagnostic frame-time value is explicitly not used as the real-device
       33 ms performance verdict.
 - [x] RP2040 Release UF2 build; current artifact is in `build/`.
+- [x] Product UART boot identity is emitted as a flushed `PICO_SKYACE_BOOT`
+      line with app/version/build/watchdog/clock/UART fields; the display
+      initialization boundary repeats the app/version/build identity, and a
+      500 ms CH340/host-COM settle interval precedes the first identity line on
+      cold power-on. The implementation and v0.9.18 emulator evidence are in
+      [`v0.9.18 BUILD.md`](validation/2026-09-12-v0.9.18/BUILD.md).
 - [x] Emulator smoke evidence for boot/title/play/pause/audio and a shortened
       real-play demo path; see `docs/validation/2026-09-10-demo/BUILD.md`.
 - [x] Production-timing emulator scenarios are now checked in for the complete
@@ -41,7 +47,7 @@ supported target until separately tested.
       in a persistent artifact directory; verify a SHA-256 manifest before any
       cleanup. An unclassified temporary file is not eligible for deletion.
 
-The current verification build is `0.9.16`. It is intentionally kept below
+The current verification build is `0.9.18`. It is intentionally kept below
 `1.0.0` while diagnostics and emulator checks are run. The final `1.0.0`
 version bump is a one-time bookkeeping step immediately before the clean
 release build; no diagnostic or emulator-only changes are made under `1.0.0`.

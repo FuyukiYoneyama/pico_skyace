@@ -10,6 +10,23 @@ Release preparation for v1.0.0 is tracked in
 [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md). No v1.0.0 firmware is
 claimed until the production build and the target-hardware gate are complete.
 
+## [0.9.18] - 2026-09-12
+
+- Added a 500 ms UART settle interval after `stdio_init_all()` and before the
+  first `PICO_SKYACE_BOOT` line. This gives the CH340/host COM port time to
+  re-enumerate on a cold power-on while retaining the existing flushed identity
+  and display-boundary fallback records.
+
+## [0.9.17] - 2026-09-12
+
+- Added a flushed, one-line `PICO_SKYACE_BOOT` identity record containing the
+  application name, firmware version, build timestamp, watchdog state, clock,
+  and UART settings before peripheral initialization. The display boundary
+  repeats the application/version/build identity so a physical UART capture
+  remains attributable even when the earliest boot bytes are unavailable.
+- Retained the existing human-readable startup and gameplay records for
+  compatibility with the validation scenarios.
+
 ## [0.9.16] - 2026-09-12
 
 - Release-preparation verification build for the standard RP2040 PicoCalc
