@@ -90,6 +90,11 @@ release build; no diagnostic or emulator-only changes are made under `1.0.0`.
       The reported UF2 version, SHA-256, and exact test timestamp were not
       supplied; before tagging `1.0.0`, associate this acceptance with the final
       UF2 (or repeat the smoke test after the final build).
+- [x] Cold-power UART identity fix was confirmed with the v0.9.18 UF2: the
+      preserved `20260912_170847.log` contains three boot sequences, each
+      starting with `PICO_SKYACE_BOOT ... version=0.9.18`, with
+      `WATCHDOG_CAUSED_REBOOT=0` and successful LCD/keyboard/SD/high-score
+      initialization. Its SHA-256 is recorded in the v0.9.18 build record.
 - [x] User-reported 20-minute upper-load play run completed without issue on
       2026-09-10. This is a manual stability-acceptance record; the tested
       UF2 hash, UART log, and exact run metadata were not supplied.

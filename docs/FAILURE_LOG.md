@@ -12,7 +12,9 @@
   `stdio_usb_connected()`による判定も使えない。
 - 是正: `0.9.18`で`stdio_init_all()`後に500msの整定待ちを追加し、その後に
   `PICO_SKYACE_BOOT`をflushして出力する。既存のLCD初期化境界の識別行は維持する。
-- 残確認: 0.9.18 UF2を実機へ書き込み、電源OFF/ON後のログ先頭で`version=0.9.18`を確認する。
+- 解決確認: `/home/fuyuki/pico_dvl/codex/log/20260912_170847.log`（SHA-256:
+  `79ddb57d49552497b5af1ca6336cb66942a7312ed37159c4f5753aa0531be57c`）で、3回分の
+  電源起動列すべてが`PICO_SKYACE_BOOT ... version=0.9.18`から始まることを確認した。
 
 ## 2026-09-12: 起動UARTの先頭でゲーム名・版番号を識別できない
 

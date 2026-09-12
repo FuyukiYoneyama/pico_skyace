@@ -41,8 +41,9 @@
 電源再投入ではCH340/ホスト側COMの再認識前に起動行が失われることを確認した。UARTはホストの
 接続状態を検出できないため、`stdio_init_all()`後に500ms待ってから`PICO_SKYACE_BOOT`を
 出力するよう変更した。`VERSION`を0.9.18へ更新し、エミュレーター、ホストテスト、RP2040
-Releaseビルドを再実行する。実機では0.9.18 UF2で、ログ先頭が`PICO_SKYACE_BOOT ...
-version=0.9.18`になることを確認する。
+Releaseビルドを再実行した。実機ログ`20260912_170847.log`では3回分の起動列すべてが
+`PICO_SKYACE_BOOT ... version=0.9.18`から始まり、`WATCHDOG_CAUSED_REBOOT=0`、LCD、
+キーボード、SD、ハイスコア初期化も成功したため、起動UART列挙待ち修正を実機合格とする。
 直前は [v0.9.13 ハイスコア・README画像更新ビルド記録](validation/2026-09-12-v0.9.13/BUILD.md)。
 直前は [v0.9.12 ミサイル発射位置・README構成調整ビルド記録](validation/2026-09-12-v0.9.12/BUILD.md)。
 直前のミサイル発射位置・機銃トレーサ調整は [v0.9.11ビルド記録](validation/2026-09-12-v0.9.11/BUILD.md)。

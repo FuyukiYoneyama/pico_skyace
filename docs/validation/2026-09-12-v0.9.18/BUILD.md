@@ -84,9 +84,16 @@ PICO_SKYACE_BOOT app=pico_skyace version=0.9.18 build="2026-09-12T07:45:54Z" WAT
 
 `/home/fuyuki/pico_dvl/codex/log/20260912_162230.log`はSHA-256
 `ab6b185e6afeef71a8bf1a930d8484995641cfd624015defb42f3d0cb58d0d7a`（92行）で保全されている。
-このログはゲーム動作（Wave 4デモ、30秒遷移、GameOver帰還、SD/ハイスコア）を示すが、
-先頭に`version`または`PICO_SKYACE_BOOT`がないため、0.9.18 UF2の実行証跡とは扱わない。
-0.9.18 UF2で電源OFF/ONし、ログ先頭に`version=0.9.18`が出ることを別途確認する。
+このログはゲーム動作の参考記録だが、先頭に`version`または`PICO_SKYACE_BOOT`がないため、
+0.9.18 UF2の実行証跡とは扱わない。
+
+実機で0.9.18 UF2を電源OFF/ONしたログは
+`/home/fuyuki/pico_dvl/codex/log/20260912_170847.log`（SHA-256:
+`79ddb57d49552497b5af1ca6336cb66942a7312ed37159c4f5753aa0531be57c`、55行）である。
+3回分の起動列すべてが`PICO_SKYACE_BOOT app=pico_skyace version=0.9.18`から始まり、
+`WATCHDOG_CAUSED_REBOOT=0`、LCD/キーボード/SD/ハイスコア初期化が成功した。最初の
+起動列ではWave 4デモ開始も確認できる。この結果により、500msのCH340/COM整定待ちによる
+起動UART先頭行の取りこぼし修正を実機で合格とする。
 
 ## 公開工程
 
