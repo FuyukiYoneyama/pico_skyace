@@ -41,6 +41,10 @@ supported target until separately tested.
       real-play demo path; see `docs/validation/2026-09-10-demo/BUILD.md`.
 - [x] Production-timing emulator scenarios are now checked in for the complete
       title/demo cycle and game-over timeout (`tests/emulator/`).
+- [x] README discloses that the product configuration sets RP2040 to 250 MHz,
+      above the 133 MHz maximum in Raspberry Pi's published RP2040
+      specifications, and explains the resulting individual-unit/power/thermal
+      caveat with a link to the official specification.
 
 - [ ] For every `/tmp`-based build or measurement, preserve the raw log, report,
       input/scenario, reproduction inputs, used BIN/UF2, and command/configuration
@@ -95,6 +99,10 @@ release build; no diagnostic or emulator-only changes are made under `1.0.0`.
       starting with `PICO_SKYACE_BOOT ... version=0.9.18`, with
       `WATCHDOG_CAUSED_REBOOT=0` and successful LCD/keyboard/SD/high-score
       initialization. Its SHA-256 is recorded in the v0.9.18 build record.
+- [ ] After the final `1.0.0` build, associate that exact UF2 SHA-256 and build
+      ID with a short real-device smoke log. The v0.9.18 hardware log proves
+      the cold-boot UART fix, but does not by itself identify the future
+      `1.0.0` UF2.
 - [x] User-reported 20-minute upper-load play run completed without issue on
       2026-09-10. This is a manual stability-acceptance record; the tested
       UF2 hash, UART log, and exact run metadata were not supplied.

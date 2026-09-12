@@ -10,6 +10,10 @@ Release preparation for v1.0.0 is tracked in
 [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md). No v1.0.0 firmware is
 claimed until the production build and the target-hardware gate are complete.
 
+- Documented that the product config runs RP2040 at 250 MHz for LCD timing,
+  above the 133 MHz limit stated in Raspberry Pi's RP2040 specifications, and
+  recorded the associated hardware/individual-unit caveat in `README.md`.
+
 ## [0.9.18] - 2026-09-12
 
 - Added a 500 ms UART settle interval after `stdio_init_all()` and before the
